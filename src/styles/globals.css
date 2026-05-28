@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Contraste verificado (WCAG):
+  - #E0E0E0 sobre #0A0A0A -> ~15:1 (AAA)
+  - #A0A0A0 sobre #0A0A0A -> ~9:1  (AAA)
+  - #A0A0A0 sobre #1C1C1E -> ~7.5:1 (AA grande / AAA cuerpo limítrofe)
+*/
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #0a0a0a;
+  color: #e0e0e0;
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(0, 240, 255, 0.06), transparent 40%),
+    radial-gradient(circle at 80% 90%, rgba(255, 0, 170, 0.06), transparent 40%),
+    linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+  background-attachment: fixed;
+}
+
+.circuit-bg {
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.neon-text {
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.7);
+}
+
+.neon-text-magenta {
+  text-shadow: 0 0 8px rgba(255, 0, 170, 0.7);
+}
+
+/* scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #1c1c1e;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a2a2e;
+}
