@@ -32,6 +32,7 @@ export const ridgeplotDefinition: Omit<ChartDefinition, "renderComponent"> = {
   optionsSchema: [
     { key: "title",   label: "Título",                   type: "text",    default: "",   group: "Referencias" },
     { key: "overlap", label: "Superposición (0.5 - 3)",   type: "number",  default: 1.6,  group: "Estilo" },
+    { key: "labelWidth", label: "Ancho de etiquetas (eje Y)", type: "number", default: 110, group: "Estilo" },
     { key: "xMin",    label: "Mínimo eje X (vacío = auto)", type: "text",  default: "",   group: "Referencias" },
     { key: "xMax",    label: "Máximo eje X (vacío = auto)", type: "text",  default: "",   group: "Referencias" },
     {
@@ -147,7 +148,7 @@ export default function Ridgeplot({ data, mapping, options, domId }: ChartProps)
     const vMax = xMaxRaw !== "" && !isNaN(+xMaxRaw) ? +xMaxRaw : autoMax;
 
     const W       = wrapRef.current.clientWidth || 680;
-    const padLeft = 110;
+    const padLeft = Math.max(40, Math.min(400, Number(options.labelWidth) || 110));
     const padRight = 30;
     const padTop  = title ? 52 : 30;
     const padBot  = 36;
@@ -210,12 +211,13 @@ export default function Ridgeplot({ data, mapping, options, domId }: ChartProps)
         .attr("fill", "none").attr("stroke", color)
         .attr("stroke-width", 1.8).attr("opacity", 0.9).attr("d", line);
 
+      const maxChars = Math.max(4, Math.floor((padLeft - 12) / 6.5));
       svg.append("text")
         .attr("x", padLeft - 8).attr("y", yBase - rowH * 0.1)
         .attr("text-anchor", "end").attr("dominant-baseline", "middle")
-        .style("font-family", "Inter, sans-serif").style("font-size", "11px")
+        .style("font-family", "Calibri, 'Segoe UI', sans-serif").style("font-size", "11px")
         .style("fill", bg.text)
-        .text(cat.length > 14 ? cat.slice(0, 13) + "…" : cat);
+        .text(cat.length > maxChars ? cat.slice(0, maxChars - 1) + "…" : cat);
     });
     // ── Crosshair vertical ──────────────────────────────────────────────────
     // Grupo siempre encima de todo el contenido

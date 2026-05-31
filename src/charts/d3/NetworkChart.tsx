@@ -184,7 +184,7 @@ export default function NetworkChart({ data, mapping, options, domId }: ChartPro
     if (showLabels) {
       nodeG.append("text")
         .attr("dy", "0.35em").attr("x", nodeR + 4)
-        .style("font-family", "Inter, sans-serif").style("font-size", "11px")
+        .style("font-family", "Calibri, 'Segoe UI', sans-serif").style("font-size", "11px")
         .style("fill", bg.text).style("pointer-events", "none")
         .text((d) => d.id);
     }

@@ -2,11 +2,25 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import type { DataTable } from "../charts/types";
 
+/** Formatea un Date a YYYY-MM-DD (incluye hora si no es medianoche) */
+function formatDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const hasTime = d.getHours() || d.getMinutes() || d.getSeconds();
+  return hasTime ? `${ymd} ${pad(d.getHours())}:${pad(d.getMinutes())}` : ymd;
+}
+
 function coerce(value: unknown): string | number | null {
   if (value === null || value === undefined || value === "") return null;
+  // Celdas de fecha de Excel (cellDates: true) llegan como Date → YYYY-MM-DD
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : formatDate(value);
+  }
   if (typeof value === "number") return value;
   const s = String(value).trim();
   if (s === "") return null;
+  // Reconocer fechas ISO (YYYY-MM-DD / YYYY-MM-DDTHH:MM) → mantener como string
+  if (/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2})?/.test(s)) return s;
   const n = Number(s);
   return Number.isFinite(n) && /^-?\d/.test(s) ? n : s;
 }
@@ -31,7 +45,9 @@ export async function parseCSV(file: File): Promise<DataTable> {
 
 export async function parseXLSX(file: File): Promise<DataTable> {
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
+  // cellDates: true → las celdas con formato de fecha llegan como objetos Date
+  // (en vez del número serial de Excel), que coerce() convierte a YYYY-MM-DD.
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: null,

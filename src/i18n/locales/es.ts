@@ -77,6 +77,7 @@ const es = {
     assignFirst: "Asigná primero la columna {{key}} en el mapeador.",
     assignFirstMulti: "Asigná primero las columnas en el mapeador para ver las categorías.",
     removeColor: "Quitar este color",
+    resetView: "⛶ Vista completa",
   },
   groups: {
     Referencias: "Referencias",
@@ -125,8 +126,8 @@ const es = {
       },
     },
     timeline: {
-      label: "Línea de Tiempo",
-      description: "Eventos con duración ordenados cronológicamente. Zoom con scroll · arrastrá ≡ para reordenar.",
+      label: "Phase Timeline",
+      description: "Eventos con duración ordenados por fase. Zoom con scroll · arrastrá ≡ para reordenar.",
       fields: {
         label: "Evento / tarea",
         start: "Fecha inicio (YYYY-MM-DD)",
@@ -134,6 +135,37 @@ const es = {
         group: "Grupo / categoría",
       },
       options: { customColors: "Colores por grupo / evento" },
+    },
+    eventtimeline: {
+      label: "Event Timeline",
+      description: "Línea de tiempo de eje único con tarjetas alternadas. Arrastrá para desplazar.",
+      fields: {
+        date:        "Fecha / Período",
+        title:       "Título del evento",
+        description: "Descripción (opcional)",
+      },
+      options: {
+        orientation: "Orientación",
+        customColors: "Colores por evento",
+      },
+    },
+    bubblescatter: {
+      label: "Bubble Scatter",
+      description: "Diagrama de dispersión con tamaño y color variables por punto.",
+      fields: {
+        x:     "Eje X (numérico)",
+        y:     "Eje Y (numérico)",
+        size:  "Tamaño de burbuja (numérico)",
+        color: "Variable de color (opcional)",
+        label: "Etiqueta del punto (opcional)",
+      },
+      options: {
+        xLabel:      "Etiqueta eje X",
+        yLabel:      "Etiqueta eje Y",
+        showLabels:  "Mostrar etiquetas",
+        maxSize:     "Tamaño máximo de burbuja (px)",
+        customColors: "Colores por categoría",
+      },
     },
     ridgeplot: {
       label: "Ridgeplot",
@@ -194,6 +226,13 @@ const es = {
     colorscale: "Escala de color",
     nticks: "Divisiones por eje",
     customColors: "Colores por categoría",
+    labelWidth: "Ancho de etiquetas (eje Y)",
+    fitToText: "Ajustar barras al texto",
+    showGroupLegend: "Mostrar leyenda de grupos",
+    orientation: "Orientación",
+    xLabel: "Etiqueta eje X",
+    yLabel: "Etiqueta eje Y",
+    maxSize: "Tamaño máximo de burbuja (px)",
   },
   optionValues: {
     plasma: "Plasma",
@@ -203,6 +242,8 @@ const es = {
     black: "Negro",
     gray: "Gris",
     white: "Blanco",
+    horizontal: "Horizontal",
+    vertical: "Vertical",
   },
 } as const;
 

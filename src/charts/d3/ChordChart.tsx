@@ -215,7 +215,7 @@ export default function ChordChart({ data, mapping, options, domId }: ChartProps
           const cosA  = Math.cos(angle + rotRad);
           return cosA > 0.15 ? "auto" : cosA < -0.15 ? "hanging" : "middle";
         })
-        .style("font-family", "Inter, sans-serif")
+        .style("font-family", "Calibri, 'Segoe UI', sans-serif")
         .style("font-size", "11px")
         .style("fill", bg.text)
         .text((d) => groups[d.index]);

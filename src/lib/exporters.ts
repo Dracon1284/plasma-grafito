@@ -108,7 +108,7 @@ export function exportTableXLSX(data: DataTable, filename = "datos.xlsx") {
   const rows = [data.columns, ...data.rows.map((r) => r.map((v) => v ?? ""))];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Datos");
+  XLSX.utils.book_append_sheet(wb, ws, "Data");
   XLSX.writeFile(wb, filename);
 }
 

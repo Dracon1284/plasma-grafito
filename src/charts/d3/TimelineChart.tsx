@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as d3 from "d3";
 import type { ChartDefinition, ChartProps } from "../types";
 
 export const timelineDefinition: Omit<ChartDefinition, "renderComponent"> = {
   id: "timeline",
-  label: "Línea de Tiempo",
-  description: "Eventos con duración ordenados cronológicamente. Zoom con scroll · arrastrá las filas del eje Y para reordenar.",
+  label: "Phase Timeline",
+  description: "Duration events ordered chronologically by phase/group. Scroll to zoom · drag ≡ to reorder rows.",
   icon: "▶",
   engine: "d3",
   requiredFields: [
@@ -32,6 +33,9 @@ export const timelineDefinition: Omit<ChartDefinition, "renderComponent"> = {
   },
   optionsSchema: [
     { key: "title",  label: "Título",  type: "text",   default: "",  group: "Referencias" },
+    { key: "showGroupLegend", label: "Mostrar leyenda de grupos", type: "boolean", default: true, group: "Referencias" },
+    { key: "fitToText", label: "Ajustar barras al texto", type: "boolean", default: false, group: "Estilo" },
+    { key: "labelWidth", label: "Ancho de etiquetas (eje Y)", type: "number", default: 160, group: "Estilo" },
     {
       key: "palette",
       label: "Paleta",
@@ -87,13 +91,24 @@ function parseDate(v: string | number | null): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// Mide el ancho de un texto en px (para "ajustar barras al texto")
+let _measureCtx: CanvasRenderingContext2D | null = null;
+function measureText(txt: string, fontPx: number): number {
+  if (!_measureCtx) _measureCtx = document.createElement("canvas").getContext("2d");
+  if (!_measureCtx) return txt.length * fontPx * 0.6;
+  _measureCtx.font = `${fontPx}px Calibri, 'Segoe UI', sans-serif`;
+  return _measureCtx.measureText(txt).width;
+}
+
 type Item = { label: string; start: Date; end: Date; group: string };
 
 export default function TimelineChart({ data, mapping, options, domId }: ChartProps) {
+  const { t } = useTranslation();
   const wrapRef  = useRef<HTMLDivElement>(null);
   const svgRef   = useRef<SVGSVGElement>(null);
   const zoomRef  = useRef<d3.ZoomTransform>(d3.zoomIdentity);
   const [order, setOrder] = useState<number[]>([]);
+  const [resetTick, setResetTick] = useState(0);
 
   // Reinicia el orden cuando cambian los datos
   useEffect(() => {
@@ -125,6 +140,9 @@ export default function TimelineChart({ data, mapping, options, domId }: ChartPr
     const customColors = (options.customColors as Record<string, string>) || {};
     const useCustom    = paletteKey === "personalizado";
     const title        = (options.title as string) || "";
+    const fitToText      = options.fitToText === true;
+    const showGroupLegend = options.showGroupLegend !== false;
+    const labelW       = Math.max(40, Math.min(400, Number(options.labelWidth) || 160));
 
     // Construye los items según el orden actual
     const items: Item[] = order.flatMap((ri) => {
@@ -144,19 +162,51 @@ export default function TimelineChart({ data, mapping, options, domId }: ChartPr
 
     const W       = wrapRef.current.clientWidth || 720;
     const rowH    = 36;
-    const labelW  = 160;
     const handleW = 18;   // ancho del handle de drag
-    const padTop  = title ? 48 : 24;
+    const titleH  = title ? 36 : 12;
     const padBot  = 36;
+
+    // ── Layout de la leyenda de grupos (arriba, con wrap) ──────────────
+    const showLegend = showGroupLegend && grpIdx >= 0 && groups.length > 0;
+    const legendItems: { g: string; x: number; y: number }[] = [];
+    let legendH = 0;
+    if (showLegend) {
+      const swatch = 11, gap = 14, padX = labelW;
+      let lx = padX, ly = 0;
+      const avail = W - 20;
+      groups.forEach((g) => {
+        const itemW = swatch + 6 + g.length * 6.5 + gap;
+        if (lx + itemW > avail && lx > padX) { lx = padX; ly += 20; }
+        legendItems.push({ g, x: lx, y: ly });
+        lx += itemW;
+      });
+      legendH = ly + 24;
+    }
+
+    const padTop  = titleH + legendH + 8;
     const H       = padTop + items.length * rowH + padBot;
 
     svg.attr("width", W).attr("height", H).style("background", bg.bg);
 
     if (title) {
       svg.append("text")
-        .attr("x", W / 2).attr("y", 28).attr("text-anchor", "middle")
+        .attr("x", W / 2).attr("y", 24).attr("text-anchor", "middle")
         .style("font-family", "Orbitron, sans-serif").style("font-size", "15px")
         .style("fill", bg.text).text(title);
+    }
+
+    // ── Leyenda de grupos ──────────────────────────────────────────────
+    if (showLegend) {
+      const legG = svg.append("g").attr("transform", `translate(0, ${titleH})`);
+      legendItems.forEach(({ g, x, y }) => {
+        legG.append("rect")
+          .attr("x", x).attr("y", y).attr("width", 11).attr("height", 11)
+          .attr("rx", 2).attr("fill", groupColor(g));
+        legG.append("text")
+          .attr("x", x + 16).attr("y", y + 9)
+          .style("font-family", "Calibri, 'Segoe UI', sans-serif").style("font-size", "11px")
+          .style("fill", bg.text).text(g);
+      });
     }
 
     const allDates = items.flatMap((i) => [i.start, i.end]);
@@ -227,16 +277,30 @@ export default function TimelineChart({ data, mapping, options, domId }: ChartPr
 
         const x1 = xScale(item.start);
         const x2 = xScale(item.end);
-        const bw  = Math.max(x2 - x1, 4);
+        let bw  = Math.max(x2 - x1, 4);
+
+        // Ajustar barras al texto: agrandar la barra hasta que entre la etiqueta
+        if (fitToText) {
+          const need = measureText(item.label, 9) + 14;
+          if (need > bw) bw = need;
+        }
 
         g.append("rect")
           .attr("x", x1).attr("y", y + 7).attr("width", bw).attr("height", rowH - 14)
           .attr("fill", color).attr("rx", 3).attr("opacity", 0.88);
 
-        if (bw > 38) {
+        if (fitToText) {
           g.append("text")
             .attr("x", x1 + bw / 2).attr("y", y + rowH / 2)
             .attr("text-anchor", "middle").attr("dominant-baseline", "middle")
+            .style("font-family", "Calibri, 'Segoe UI', sans-serif")
+            .style("font-size", "9px").style("fill", "#0A0A0A").style("pointer-events", "none")
+            .text(item.label);
+        } else if (bw > 38) {
+          g.append("text")
+            .attr("x", x1 + bw / 2).attr("y", y + rowH / 2)
+            .attr("text-anchor", "middle").attr("dominant-baseline", "middle")
+            .style("font-family", "Calibri, 'Segoe UI', sans-serif")
             .style("font-size", "9px").style("fill", "#0A0A0A").style("pointer-events", "none")
             .text(item.label.length > 16 ? item.label.slice(0, 14) + "…" : item.label);
         }
@@ -258,13 +322,21 @@ export default function TimelineChart({ data, mapping, options, domId }: ChartPr
         .style("cursor", "ns-resize").attr("class", `handle-${i}`)
         .text("≡");
 
-      // label
+      // label (truncado al ancho disponible salvo que fitToText esté activo)
+      const availLabel = labelW - handleW - 12;
+      let labelTxt = item.label;
+      if (!fitToText && measureText(labelTxt, 11) > availLabel) {
+        while (labelTxt.length > 1 && measureText(labelTxt + "…", 11) > availLabel) {
+          labelTxt = labelTxt.slice(0, -1);
+        }
+        labelTxt += "…";
+      }
       labelsG.append("text")
         .attr("x", labelW - 8).attr("y", y + rowH / 2)
         .attr("text-anchor", "end").attr("dominant-baseline", "middle")
-        .style("font-family", "Inter, sans-serif").style("font-size", "11px")
+        .style("font-family", "Calibri, 'Segoe UI', sans-serif").style("font-size", "11px")
         .style("fill", bg.text)
-        .text(item.label.length > 20 ? item.label.slice(0, 18) + "…" : item.label);
+        .text(labelTxt);
     });
 
     // ── Drag de filas ─────────────────────────────────────────────────
@@ -405,13 +477,17 @@ export default function TimelineChart({ data, mapping, options, domId }: ChartPr
     // Restaurar zoom previo sin disparar el evento (evita loop)
     zoomOverlay.call(zoom.transform, zoomRef.current);
 
-  }, [data, mapping, options, order]);
+  }, [data, mapping, options, order, resetTick]);
 
   return (
-    <div id={domId} ref={wrapRef} className="w-full h-full min-h-[400px] overflow-auto select-none">
-      <p className="text-[10px] text-text-muted px-2 py-1 opacity-60">
-        Scroll → zoom · click y arrastrá → desplazar · arrastrá ≡ para reordenar filas
-      </p>
+    <div id={domId} ref={wrapRef} className="relative w-full h-full min-h-[400px] overflow-auto select-none">
+      <button
+        type="button"
+        onClick={() => { zoomRef.current = d3.zoomIdentity; setResetTick((n) => n + 1); }}
+        className="absolute top-2 right-2 z-10 text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+      >
+        {t("panel.resetView", "⛶ Vista completa")}
+      </button>
       <svg ref={svgRef} className="w-full" />
     </div>
   );

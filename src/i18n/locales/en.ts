@@ -77,6 +77,7 @@ const en = {
     assignFirst: "Assign the {{key}} column in the mapper first.",
     assignFirstMulti: "Assign the columns in the mapper first to see categories.",
     removeColor: "Remove this color",
+    resetView: "⛶ Full view",
   },
   groups: {
     Referencias: "Labels",
@@ -125,8 +126,8 @@ const en = {
       },
     },
     timeline: {
-      label: "Timeline",
-      description: "Duration events ordered chronologically. Scroll to zoom \xb7 drag ≡ to reorder rows.",
+      label: "Phase Timeline",
+      description: "Duration events ordered chronologically by phase. Scroll to zoom \xb7 drag ≡ to reorder rows.",
       fields: {
         label: "Event / task",
         start: "Start date (YYYY-MM-DD)",
@@ -134,6 +135,37 @@ const en = {
         group: "Group / category",
       },
       options: { customColors: "Colors by group / event" },
+    },
+    eventtimeline: {
+      label: "Event Timeline",
+      description: "Single-axis timeline with alternating event cards. Drag to pan along the axis.",
+      fields: {
+        date:        "Date / Period",
+        title:       "Event title",
+        description: "Description (optional)",
+      },
+      options: {
+        orientation: "Orientation",
+        customColors: "Colors by event",
+      },
+    },
+    bubblescatter: {
+      label: "Bubble Scatter",
+      description: "Scatter plot with varying bubble sizes and color hues.",
+      fields: {
+        x:     "X axis (numeric)",
+        y:     "Y axis (numeric)",
+        size:  "Bubble size (numeric)",
+        color: "Color variable (optional)",
+        label: "Point label (optional)",
+      },
+      options: {
+        xLabel:      "X axis label",
+        yLabel:      "Y axis label",
+        showLabels:  "Show point labels",
+        maxSize:     "Max bubble size (px)",
+        customColors: "Colors by category",
+      },
     },
     ridgeplot: {
       label: "Ridgeplot",
@@ -194,6 +226,13 @@ const en = {
     colorscale: "Color scale",
     nticks: "Axis divisions",
     customColors: "Colors by category",
+    labelWidth: "Y-axis label width",
+    fitToText: "Fit bars to text",
+    showGroupLegend: "Show group legend",
+    orientation: "Orientation",
+    xLabel: "X axis label",
+    yLabel: "Y axis label",
+    maxSize: "Max bubble size (px)",
   },
   optionValues: {
     plasma: "Plasma",
@@ -203,6 +242,8 @@ const en = {
     black: "Black",
     gray: "Gray",
     white: "White",
+    horizontal: "Horizontal",
+    vertical: "Vertical",
   },
 } as const;
 

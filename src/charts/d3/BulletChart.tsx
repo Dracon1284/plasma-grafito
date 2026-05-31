@@ -36,6 +36,7 @@ export const bulletDefinition: Omit<ChartDefinition, "renderComponent"> = {
     { key: "showValues", label: "Mostrar valor numérico (actual)",   type: "boolean", default: true, group: "Referencias" },
     { key: "showTarget", label: "Mostrar valor objetivo (meta)",     type: "boolean", default: true, group: "Referencias" },
     { key: "tickCount",  label: "Divisiones en eje numérico",        type: "number",  default: 5,    group: "Referencias" },
+    { key: "labelWidth", label: "Ancho de etiquetas (eje Y)",         type: "number",  default: 150,  group: "Estilo" },
     {
       key: "palette",
       label: "Paleta",
@@ -117,7 +118,7 @@ export default function BulletChart({ data, mapping, options, domId }: ChartProp
     const showValues = options.showValues !== false;  // valor real al final de la barra
     const showTarget = options.showTarget !== false;  // valor meta al lado del marcador
     const tickCount  = Math.max(2, Math.min(15, Number(options.tickCount) || 5));
-    const labelW     = 150;  // la etiqueta del KPI siempre está visible
+    const labelW     = Math.max(40, Math.min(400, Number(options.labelWidth) || 150));  // ancho de etiqueta KPI
 
     type Row = { label: string; actual: number; target: number; min?: number; mid?: number; max?: number };
     const rows: Row[] = data.rows
@@ -213,7 +214,7 @@ export default function BulletChart({ data, mapping, options, domId }: ChartProp
         .attr("y", padTop + i * rowH + 8 + 20)
         .attr("text-anchor", "end")
         .attr("dominant-baseline", "middle")
-        .style("font-family", "Inter, sans-serif")
+        .style("font-family", "Calibri, 'Segoe UI', sans-serif")
         .style("font-size", "12px")
         .style("fill", bg.text)
         .text(row.label);

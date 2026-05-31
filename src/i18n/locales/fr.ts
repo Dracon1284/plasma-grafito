@@ -77,6 +77,7 @@ const fr = {
     assignFirst: "Assignez d'abord la colonne {{key}} dans le mappeur.",
     assignFirstMulti: "Assignez d'abord les colonnes dans le mappeur pour voir les catégories.",
     removeColor: "Supprimer cette couleur",
+    resetView: "⛶ Vue complète",
   },
   groups: {
     Referencias: "Étiquettes",
@@ -125,8 +126,8 @@ const fr = {
       },
     },
     timeline: {
-      label: "Chronologie",
-      description: "Événements avec durée classés chronologiquement. Défilement pour zoomer · glissez ≡ pour réordonner.",
+      label: "Phase Timeline",
+      description: "Événements par phase classés chronologiquement. Défilement pour zoomer · glissez ≡ pour réordonner.",
       fields: {
         label: "Événement / tâche",
         start: "Date de début (YYYY-MM-DD)",
@@ -134,6 +135,37 @@ const fr = {
         group: "Groupe / catégorie",
       },
       options: { customColors: "Couleurs par groupe / événement" },
+    },
+    eventtimeline: {
+      label: "Event Timeline",
+      description: "Chronologie à axe unique avec cartes alternées. Glissez pour faire défiler.",
+      fields: {
+        date:        "Date / Période",
+        title:       "Titre de l'événement",
+        description: "Description (optionnel)",
+      },
+      options: {
+        orientation: "Orientation",
+        customColors: "Couleurs par événement",
+      },
+    },
+    bubblescatter: {
+      label: "Bubble Scatter",
+      description: "Nuage de points avec taille et couleur variables.",
+      fields: {
+        x:     "Axe X (numérique)",
+        y:     "Axe Y (numérique)",
+        size:  "Taille de bulle (numérique)",
+        color: "Variable de couleur (optionnel)",
+        label: "Étiquette du point (optionnel)",
+      },
+      options: {
+        xLabel:      "Étiquette axe X",
+        yLabel:      "Étiquette axe Y",
+        showLabels:  "Afficher les étiquettes",
+        maxSize:     "Taille max de bulle (px)",
+        customColors: "Couleurs par catégorie",
+      },
     },
     ridgeplot: {
       label: "Ridgeplot",
@@ -194,6 +226,13 @@ const fr = {
     colorscale: "Échelle de couleurs",
     nticks: "Divisions par axe",
     customColors: "Couleurs par catégorie",
+    labelWidth: "Largeur des étiquettes (axe Y)",
+    fitToText: "Ajuster les barres au texte",
+    showGroupLegend: "Afficher la légende des groupes",
+    orientation: "Orientation",
+    xLabel: "Étiquette axe X",
+    yLabel: "Étiquette axe Y",
+    maxSize: "Taille max de bulle (px)",
   },
   optionValues: {
     plasma: "Plasma",
@@ -203,6 +242,8 @@ const fr = {
     black: "Noir",
     gray: "Gris",
     white: "Blanc",
+    horizontal: "Horizontal",
+    vertical: "Vertical",
   },
 } as const;
 

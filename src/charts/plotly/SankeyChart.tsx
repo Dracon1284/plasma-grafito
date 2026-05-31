@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Plotly from "plotly.js-dist-min";
 import type { Data } from "plotly.js-dist-min";
 import type { ChartDefinition, ChartProps } from "../types";
@@ -86,6 +86,52 @@ const bgColorMap: Record<string, { bg: string; text: string; nodeBorder: string 
 
 export default function SankeyChart({ data, mapping, options, domId }: ChartProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // ── Pan + zoom (transform CSS sobre el contenedor del gráfico) ──────────────
+  const [view, setView] = useState({ x: 0, y: 0, k: 1 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const dragRef = useRef<{ active: boolean; px: number; py: number }>({
+    active: false, px: 0, py: 0,
+  });
+
+  const resetView = useCallback(() => setView({ x: 0, y: 0, k: 1 }), []);
+
+  // Listener de rueda nativo (non-passive) para poder usar preventDefault
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const { x, y, k } = viewRef.current;
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const nk = Math.max(0.4, Math.min(8, k * factor));
+      setView({
+        k: nk,
+        x: cx - (cx - x) * (nk / k),
+        y: cy - (cy - y) * (nk / k),
+      });
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    dragRef.current = { active: true, px: e.clientX, py: e.clientY };
+  }, []);
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current.active) return;
+    const dx = e.clientX - dragRef.current.px;
+    const dy = e.clientY - dragRef.current.py;
+    dragRef.current.px = e.clientX;
+    dragRef.current.py = e.clientY;
+    setView((v) => ({ ...v, x: v.x + dx, y: v.y + dy }));
+  }, []);
+  const endDrag = useCallback(() => { dragRef.current.active = false; }, []);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -162,7 +208,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
           : undefined,
         paper_bgcolor: bg.bg,
         plot_bgcolor: bg.bg,
-        font: { color: bg.text, family: "Inter" },
+        font: { color: bg.text, family: "Calibri, 'Segoe UI', sans-serif" },
         margin: { l: 20, r: 20, t: title ? 50 : 20, b: 20 },
       },
       { responsive: true, displaylogo: false }
@@ -174,5 +220,35 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
     };
   }, [data, mapping, options]);
 
-  return <div id={domId} ref={ref} className="w-full h-full min-h-[500px]" />;
+  return (
+    <div
+      ref={wrapRef}
+      className="relative w-full h-full min-h-[500px] overflow-hidden select-none cursor-grab active:cursor-grabbing"
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={endDrag}
+      onMouseLeave={endDrag}
+      onDoubleClick={resetView}
+    >
+      {(view.k !== 1 || view.x !== 0 || view.y !== 0) && (
+        <button
+          type="button"
+          onClick={resetView}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute top-2 right-2 z-10 text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+        >
+          ⛶ Reset
+        </button>
+      )}
+      <div
+        id={domId}
+        ref={ref}
+        className="w-full h-full min-h-[500px]"
+        style={{
+          transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`,
+          transformOrigin: "0 0",
+        }}
+      />
+    </div>
+  );
 }

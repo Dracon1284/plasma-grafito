@@ -179,9 +179,9 @@ export default function ParallelCoordsChart({ data, mapping, options, domId }: C
           },
           dimensions,
           // labelfont, tickfont, rangefont solo son válidos a nivel de traza (no por dimensión)
-          labelfont: { color: bg.text, family: "Inter, sans-serif", size: 12 },
-          tickfont:  { color: bg.text, family: "Inter, sans-serif", size: 10 },
-          rangefont: { color: bg.text, family: "Inter, sans-serif", size: 10 },
+          labelfont: { color: bg.text, family: "Calibri, 'Segoe UI', sans-serif", size: 12 },
+          tickfont:  { color: bg.text, family: "Calibri, 'Segoe UI', sans-serif", size: 10 },
+          rangefont: { color: bg.text, family: "Calibri, 'Segoe UI', sans-serif", size: 10 },
         } as any,
       ],
       {
@@ -190,7 +190,7 @@ export default function ParallelCoordsChart({ data, mapping, options, domId }: C
           : undefined,
         paper_bgcolor: bg.bg,
         plot_bgcolor:  bg.bg,
-        font: { color: bg.text, family: "Inter" },
+        font: { color: bg.text, family: "Calibri, 'Segoe UI', sans-serif" },
         margin: { l: 60, r: 60, t: title ? 80 : 60, b: 30 },
       },
       { responsive: true, displaylogo: false }
