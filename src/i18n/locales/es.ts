@@ -97,13 +97,13 @@ const es = {
     },
     network: {
       label: "Diagrama de Redes",
-      description: "Nodos y conexiones con layout de fuerza. Arrastrá los nodos para reposicionarlos.",
+      description: "Nodos y conexiones con layout de fuerza.",
       fields: { group: "Grupo (color de nodo)" },
       options: { customColors: "Colores por nodo / grupo" },
     },
     bubblenetwork: {
       label: "Bubble Network",
-      description: "Diagrama de redes con nodos de tamaño proporcional a un valor numérico. Arrastrá los nodos para reposicionarlos.",
+      description: "Diagrama de redes con nodos de tamaño proporcional a un valor numérico.",
       fields: { nodeValue: "Valor del nodo origen", group: "Grupo (color de nodo)" },
       options: { showValues: "Mostrar valor en el nodo", customColors: "Colores por nodo / grupo" },
     },
@@ -127,7 +127,7 @@ const es = {
     },
     timeline: {
       label: "Phase Timeline",
-      description: "Eventos con duración ordenados por fase. Zoom con scroll · arrastrá ≡ para reordenar.",
+      description: "Eventos con duración ordenados por fase.",
       fields: {
         label: "Evento / tarea",
         start: "Fecha inicio (YYYY-MM-DD)",
@@ -138,14 +138,19 @@ const es = {
     },
     eventtimeline: {
       label: "Event Timeline",
-      description: "Línea de tiempo de eje único con tarjetas alternadas. Arrastrá para desplazar.",
+      description: "Línea de tiempo de eje único con tarjetas alternadas.",
       fields: {
-        date:        "Fecha / Período",
+        date:        "Fecha (YYYY-MM-DD)",
         title:       "Título del evento",
         description: "Descripción (opcional)",
       },
       options: {
-        orientation: "Orientación",
+        orientation:  "Orientación",
+        fontFamily:   "Fuente del texto",
+        titleBold:    "Título en negrita",
+        titleItalic:  "Título en cursiva",
+        descItalic:   "Descripción en cursiva",
+        connLen:      "Longitud del conector (px)",
         customColors: "Colores por evento",
       },
     },
@@ -244,6 +249,10 @@ const es = {
     white: "Blanco",
     horizontal: "Horizontal",
     vertical: "Vertical",
+    calibri: "Calibri",
+    inter: "Inter",
+    orbitron: "Orbitron",
+    courier: "Courier New",
   },
 } as const;
 

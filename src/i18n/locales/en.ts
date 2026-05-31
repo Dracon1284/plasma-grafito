@@ -97,13 +97,13 @@ const en = {
     },
     network: {
       label: "Network Diagram",
-      description: "Nodes and connections with force layout. Drag nodes to reposition them.",
+      description: "Nodes and connections with force layout.",
       fields: { group: "Group (node color)" },
       options: { customColors: "Colors by node / group" },
     },
     bubblenetwork: {
       label: "Bubble Network",
-      description: "Network diagram with variable node size proportional to a numeric value. Drag nodes to reposition.",
+      description: "Network diagram with variable node size proportional to a numeric value.",
       fields: { nodeValue: "Source node value", group: "Group (node color)" },
       options: { showValues: "Show value in node", customColors: "Colors by node / group" },
     },
@@ -127,7 +127,7 @@ const en = {
     },
     timeline: {
       label: "Phase Timeline",
-      description: "Duration events ordered chronologically by phase. Scroll to zoom \xb7 drag ≡ to reorder rows.",
+      description: "Duration events ordered chronologically by phase.",
       fields: {
         label: "Event / task",
         start: "Start date (YYYY-MM-DD)",
@@ -138,14 +138,19 @@ const en = {
     },
     eventtimeline: {
       label: "Event Timeline",
-      description: "Single-axis timeline with alternating event cards. Drag to pan along the axis.",
+      description: "Single-axis timeline with alternating event cards.",
       fields: {
-        date:        "Date / Period",
+        date:        "Date (YYYY-MM-DD)",
         title:       "Event title",
         description: "Description (optional)",
       },
       options: {
-        orientation: "Orientation",
+        orientation:  "Orientation",
+        fontFamily:   "Text font",
+        titleBold:    "Title bold",
+        titleItalic:  "Title italic",
+        descItalic:   "Description italic",
+        connLen:      "Connector length (px)",
         customColors: "Colors by event",
       },
     },
@@ -244,6 +249,10 @@ const en = {
     white: "White",
     horizontal: "Horizontal",
     vertical: "Vertical",
+    calibri: "Calibri",
+    inter: "Inter",
+    orbitron: "Orbitron",
+    courier: "Courier New",
   },
 } as const;
 

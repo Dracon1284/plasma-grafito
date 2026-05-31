@@ -5,7 +5,7 @@ import type { ChartDefinition, ChartProps } from "../types";
 export const networkDefinition: Omit<ChartDefinition, "renderComponent"> = {
   id: "network",
   label: "Diagrama de Redes",
-  description: "Nodos y conexiones con layout de fuerza. Arrastrá los nodos para reposicionarlos.",
+  description: "Nodes and connections with force layout.",
   icon: "⬡",
   engine: "d3",
   requiredFields: [

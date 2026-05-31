@@ -97,7 +97,7 @@ const fr = {
     },
     network: {
       label: "Diagramme de Réseau",
-      description: "Nœuds et connexions avec disposition par force. Faites glisser les nœuds pour les repositionner.",
+      description: "Nœuds et connexions avec disposition par force.",
       fields: { group: "Groupe (couleur du nœud)" },
       options: { customColors: "Couleurs par nœud / groupe" },
     },
@@ -127,7 +127,7 @@ const fr = {
     },
     timeline: {
       label: "Phase Timeline",
-      description: "Événements par phase classés chronologiquement. Défilement pour zoomer · glissez ≡ pour réordonner.",
+      description: "Événements par phase classés chronologiquement.",
       fields: {
         label: "Événement / tâche",
         start: "Date de début (YYYY-MM-DD)",
@@ -138,14 +138,19 @@ const fr = {
     },
     eventtimeline: {
       label: "Event Timeline",
-      description: "Chronologie à axe unique avec cartes alternées. Glissez pour faire défiler.",
+      description: "Chronologie à axe unique avec cartes alternées.",
       fields: {
-        date:        "Date / Période",
+        date:        "Date (YYYY-MM-DD)",
         title:       "Titre de l'événement",
         description: "Description (optionnel)",
       },
       options: {
-        orientation: "Orientation",
+        orientation:  "Orientation",
+        fontFamily:   "Police du texte",
+        titleBold:    "Titre en gras",
+        titleItalic:  "Titre en italique",
+        descItalic:   "Description en italique",
+        connLen:      "Longueur du connecteur (px)",
         customColors: "Couleurs par événement",
       },
     },
@@ -244,6 +249,10 @@ const fr = {
     white: "Blanc",
     horizontal: "Horizontal",
     vertical: "Vertical",
+    calibri: "Calibri",
+    inter: "Inter",
+    orbitron: "Orbitron",
+    courier: "Courier New",
   },
 } as const;
 

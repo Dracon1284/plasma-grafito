@@ -5,7 +5,7 @@ import type { ChartDefinition, ChartProps } from "../types";
 export const bubbleNetworkDefinition: Omit<ChartDefinition, "renderComponent"> = {
   id: "bubblenetwork",
   label: "Bubble Network",
-  description: "Diagrama de redes con nodos de tamaño proporcional a un valor numérico. Arrastrá los nodos para reposicionarlos.",
+  description: "Network diagram with variable node size proportional to a numeric value.",
   icon: "◉",
   engine: "d3",
   requiredFields: [

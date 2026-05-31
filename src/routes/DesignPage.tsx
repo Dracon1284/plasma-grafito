@@ -47,32 +47,8 @@ export default function DesignPage() {
             {t("design.subtitle")}
           </p>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
-            {charts.map((c) => (
-              <Card
-                key={c.id}
-                interactive
-                glow={selected === c.id ? "blue" : "blue"}
-                onClick={() => setSelected(c.id)}
-                className={
-                  selected === c.id
-                    ? "border-plasma-blue shadow-glow-blue"
-                    : ""
-                }
-              >
-                <div className="text-2xl mb-2">{c.icon}</div>
-                <div className="font-display text-lg mb-1">
-                  {t(`charts.${c.id}.label`, c.label)}
-                </div>
-                <p className="text-text-muted text-sm">
-                  {t(`charts.${c.id}.description`, c.description)}
-                </p>
-              </Card>
-            ))}
-          </div>
-
           {selectedDef && (
-            <Card className="border-plasma-blue/30">
+            <Card className="border-plasma-blue/30 mb-8">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
                   <div className="text-plasma-blue font-display tracking-wider text-xs">
@@ -110,6 +86,31 @@ export default function DesignPage() {
               />
             </Card>
           )}
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {charts.map((c) => (
+              <Card
+                key={c.id}
+                interactive
+                glow={selected === c.id ? "blue" : "blue"}
+                onClick={() => setSelected(c.id)}
+                className={
+                  selected === c.id
+                    ? "border-plasma-blue shadow-glow-blue"
+                    : ""
+                }
+              >
+                <div className="text-2xl mb-2">{c.icon}</div>
+                <div className="font-display text-lg mb-1">
+                  {t(`charts.${c.id}.label`, c.label)}
+                </div>
+                <p className="text-text-muted text-sm">
+                  {t(`charts.${c.id}.description`, c.description)}
+                </p>
+              </Card>
+            ))}
+          </div>
+
         </div>
       </main>
     </div>

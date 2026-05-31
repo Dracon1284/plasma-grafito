@@ -6,7 +6,7 @@ import type { ChartDefinition, ChartProps } from "../types";
 export const timelineDefinition: Omit<ChartDefinition, "renderComponent"> = {
   id: "timeline",
   label: "Phase Timeline",
-  description: "Duration events ordered chronologically by phase/group. Scroll to zoom · drag ≡ to reorder rows.",
+  description: "Duration events ordered chronologically by phase/group.",
   icon: "▶",
   engine: "d3",
   requiredFields: [
