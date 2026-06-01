@@ -97,6 +97,11 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
   const panModeRef = useRef(false);
   panModeRef.current = panMode;
 
+  // Nonce para forzar un re-render limpio de Plotly (recupera nodos
+  // arrastrados fuera del área visible: vuelve al layout automático)
+  const [layoutNonce, setLayoutNonce] = useState(0);
+  const resetLayout = useCallback(() => setLayoutNonce((n) => n + 1), []);
+
   // ── Pan + zoom (transform CSS sobre el contenedor del gráfico) ──────────────
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
   const viewRef = useRef(view);
@@ -214,6 +219,10 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
         {
           type: "sankey",
           orientation: "h",
+          // "snap" mantiene los nodos alineados en columnas; al re-renderizar
+          // (layoutNonce) se recalcula la posición automática, recuperando
+          // cualquier nodo que se haya arrastrado fuera del lienzo.
+          arrangement: "snap",
           node: {
             label: showLabels ? labels : labels.map(() => ""),
             color: nodeColors,
@@ -239,7 +248,8 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
         paper_bgcolor: bg.bg,
         plot_bgcolor: bg.bg,
         font: { color: bg.text, family: "Calibri, 'Segoe UI', sans-serif" },
-        margin: { l: 20, r: 20, t: title ? 50 : 20, b: 20 },
+        // Márgenes amplios para tener espacio al separar/arrastrar las cintas
+        margin: { l: 70, r: 70, t: title ? 60 : 40, b: 40 },
       },
       { responsive: true, displaylogo: false }
     );
@@ -248,7 +258,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
     return () => {
       if (el) Plotly.purge(el);
     };
-  }, [data, mapping, options]);
+  }, [data, mapping, options, layoutNonce]);
 
   return (
     <div
@@ -263,6 +273,17 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
     >
       {/* Toolbar */}
       <div className="absolute top-2 right-2 z-10 flex gap-1">
+        {!panMode && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={resetLayout}
+            title="Restablecer posiciones de los nodos (recupera cajas arrastradas fuera)"
+            className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+          >
+            ↺ Posiciones
+          </button>
+        )}
         {panMode && (
           <>
             <button
