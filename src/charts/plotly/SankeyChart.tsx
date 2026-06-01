@@ -284,24 +284,20 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
             ↺ Posiciones
           </button>
         )}
-        {panMode && (
-          <>
-            <button
-              type="button"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => zoomCenter(1.25)}
-              title="Zoom in"
-              className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
-            >＋</button>
-            <button
-              type="button"
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={() => zoomCenter(1 / 1.25)}
-              title="Zoom out"
-              className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
-            >－</button>
-          </>
-        )}
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={() => zoomCenter(1.25)}
+          title="Ajustar escala: agrandar"
+          className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+        >＋</button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={() => zoomCenter(1 / 1.25)}
+          title="Ajustar escala: achicar"
+          className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+        >－</button>
         {(view.k !== 1 || view.x !== 0 || view.y !== 0) && (
           <button
             type="button"
