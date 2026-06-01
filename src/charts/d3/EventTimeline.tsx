@@ -48,6 +48,27 @@ export const eventTimelineDefinition: Omit<ChartDefinition, "renderComponent"> =
     { key: "titleBold",   label: "Title bold",           type: "boolean", default: true,          group: "Estilo" },
     { key: "titleItalic", label: "Title italic",         type: "boolean", default: false,         group: "Estilo" },
     { key: "descItalic",  label: "Description italic",   type: "boolean", default: false,         group: "Estilo" },
+    {
+      key: "dateFormat", label: "Date label format", type: "select", default: "auto", group: "Estilo",
+      options: [
+        { value: "auto",      label: "Auto" },
+        { value: "year",      label: "Year" },
+        { value: "monthYear", label: "Month · Year" },
+        { value: "date",      label: "Date (YYYY-MM-DD)" },
+        { value: "datetime",  label: "Date + Time" },
+      ],
+    },
+    { key: "showScale",   label: "Show time scale",       type: "boolean", default: false,         group: "Estilo" },
+    {
+      key: "scaleUnit", label: "Scale unit", type: "select", default: "year", group: "Estilo",
+      dependsOn: { key: "showScale", equals: true },
+      options: [
+        { value: "year",  label: "Year"  },
+        { value: "month", label: "Month" },
+        { value: "day",   label: "Day"   },
+        { value: "hour",  label: "Hour"  },
+      ],
+    },
     { key: "lineColor",   label: "Axis line color",       type: "color",   default: "#00F0FF",     group: "Estilo" },
     {
       key: "palette",     label: "Palette",              type: "select",  default: "plasma",
@@ -96,6 +117,34 @@ const fontFamilyMap: Record<string, string> = {
   orbitron: "Orbitron, sans-serif",
   courier:  "'Courier New', monospace",
 };
+
+// ── Date display helpers ──────────────────────────────────────────────────────
+
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function formatDisplayDate(dateStr: string, fmt: string): string {
+  if (!dateStr) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  switch (fmt) {
+    case "year":      return String(d.getFullYear());
+    case "monthYear": return `${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+    case "date":      return dateStr.slice(0, 10);
+    case "datetime":  return dateStr.slice(0, 16).replace("T", " ");
+    default:          return dateStr; // "auto" — as stored
+  }
+}
+
+function scaleTickLabel(d: Date, unit: string): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  switch (unit) {
+    case "year":  return String(d.getFullYear());
+    case "month": return `${MONTHS_SHORT[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+    case "day":   return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+    case "hour":  return `${pad(d.getHours())}:00`;
+    default:      return String(d.getFullYear());
+  }
+}
 
 // ── Text-wrap helper ──────────────────────────────────────────────────────────
 
@@ -167,6 +216,9 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
     const titleBold   = options.titleBold  !== false;
     const titleItalic = options.titleItalic === true;
     const descItalic  = options.descItalic  === true;
+    const dateFormat  = (options.dateFormat as string) || "auto";
+    const showScale   = options.showScale === true;
+    const scaleUnit   = (options.scaleUnit as string) || "year";
 
     const colorFor = (title: string, i: number) =>
       useCustom && custom[title] ? custom[title] : palette[i % palette.length];
@@ -266,7 +318,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .style("font-family", fontFamily)
           .style("font-size", "11px").style("font-weight", "700")
           .style("fill", color)
-          .text(ev.date);
+          .text(formatDisplayDate(ev.date, dateFormat));
 
         // Vertical dashed connector
         const cStart = above ? midY - 10 : midY + 10;
@@ -312,6 +364,35 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
             .text(line);
         });
       });
+
+      // Time scale ticks
+      if (showScale && events.length >= 2) {
+        const firstDate = new Date(events[0].date);
+        const lastDate  = new Date(events[events.length - 1].date);
+        if (!isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime()) && firstDate < lastDate) {
+          const x0 = padX;
+          const x1 = padX + (events.length - 1) * spacing;
+          const dateScale = d3.scaleTime().domain([firstDate, lastDate]).range([x0, x1]);
+          const intervalMap: Record<string, d3.CountableTimeInterval> = {
+            year: d3.timeYear, month: d3.timeMonth, day: d3.timeDay, hour: d3.timeHour,
+          };
+          const tickInterval = (intervalMap[scaleUnit] || d3.timeYear).every(1);
+          const ticks = (tickInterval ? dateScale.ticks(tickInterval) : dateScale.ticks(10)).slice(0, 40);
+          ticks.forEach((tick) => {
+            const tx = dateScale(tick);
+            g.append("line")
+              .attr("x1", tx).attr("x2", tx)
+              .attr("y1", midY - 7).attr("y2", midY + 7)
+              .attr("stroke", lineColor).attr("stroke-width", 0.8).attr("opacity", 0.45);
+            g.append("text")
+              .attr("x", tx).attr("y", midY + 28)
+              .attr("text-anchor", "middle")
+              .style("font-family", fontFamily).style("font-size", "8px")
+              .style("fill", lineColor).style("opacity", "0.6")
+              .text(scaleTickLabel(tick, scaleUnit));
+          });
+        }
+      }
 
       // Drag overlay — horizontal pan only
       svg.append("rect")
@@ -380,7 +461,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .style("font-family", fontFamily)
           .style("font-size", "11px").style("font-weight", "700")
           .style("fill", color)
-          .text(ev.date);
+          .text(formatDisplayDate(ev.date, dateFormat));
 
         // Horizontal dashed connector
         const cxStart = toRight ? lineX + 10 : lineX - 10;
@@ -425,6 +506,35 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
             .text(line);
         });
       });
+
+      // Time scale ticks
+      if (showScale && events.length >= 2) {
+        const firstDate = new Date(events[0].date);
+        const lastDate  = new Date(events[events.length - 1].date);
+        if (!isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime()) && firstDate < lastDate) {
+          const y0 = padY;
+          const y1 = padY + (events.length - 1) * spacing;
+          const dateScale = d3.scaleTime().domain([firstDate, lastDate]).range([y0, y1]);
+          const intervalMap: Record<string, d3.CountableTimeInterval> = {
+            year: d3.timeYear, month: d3.timeMonth, day: d3.timeDay, hour: d3.timeHour,
+          };
+          const tickInterval = (intervalMap[scaleUnit] || d3.timeYear).every(1);
+          const ticks = (tickInterval ? dateScale.ticks(tickInterval) : dateScale.ticks(10)).slice(0, 40);
+          ticks.forEach((tick) => {
+            const ty = dateScale(tick);
+            g.append("line")
+              .attr("x1", lineX - 7).attr("x2", lineX + 7)
+              .attr("y1", ty).attr("y2", ty)
+              .attr("stroke", lineColor).attr("stroke-width", 0.8).attr("opacity", 0.45);
+            g.append("text")
+              .attr("x", lineX + 10).attr("y", ty + 3)
+              .attr("text-anchor", "start")
+              .style("font-family", fontFamily).style("font-size", "8px")
+              .style("fill", lineColor).style("opacity", "0.6")
+              .text(scaleTickLabel(tick, scaleUnit));
+          });
+        }
+      }
 
       // Drag overlay — vertical pan only
       svg.append("rect")
