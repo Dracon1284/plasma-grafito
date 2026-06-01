@@ -88,6 +88,13 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
   const ref = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
+  // ── Pan/zoom mode toggle ────────────────────────────────────────────────────
+  // panMode=false → Plotly handles mouse (drag nodes/ribbons)
+  // panMode=true  → CSS transform pan/zoom active
+  const [panMode, setPanMode] = useState(false);
+  const panModeRef = useRef(false);
+  panModeRef.current = panMode;
+
   // ── Pan + zoom (transform CSS sobre el contenedor del gráfico) ──────────────
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
   const viewRef = useRef(view);
@@ -103,6 +110,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
     const el = wrapRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
+      if (!panModeRef.current) return; // let Plotly handle events in edit mode
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const cx = e.clientX - rect.left;
@@ -121,6 +129,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
   }, []);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!panModeRef.current) return;
     dragRef.current = { active: true, px: e.clientX, py: e.clientY };
   }, []);
   const onMouseMove = useCallback((e: React.MouseEvent) => {
@@ -223,23 +232,39 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
   return (
     <div
       ref={wrapRef}
-      className="relative w-full h-full min-h-[500px] overflow-hidden select-none cursor-grab active:cursor-grabbing"
+      className={`relative w-full h-full min-h-[500px] overflow-hidden select-none ${panMode ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={endDrag}
       onMouseLeave={endDrag}
-      onDoubleClick={resetView}
+      onDoubleClick={panMode ? resetView : undefined}
     >
-      {(view.k !== 1 || view.x !== 0 || view.y !== 0) && (
+      {/* Toolbar */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1">
+        {(view.k !== 1 || view.x !== 0 || view.y !== 0) && (
+          <button
+            type="button"
+            onClick={resetView}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+          >
+            ⛶ Reset
+          </button>
+        )}
         <button
           type="button"
-          onClick={resetView}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute top-2 right-2 z-10 text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+          onClick={() => setPanMode((m) => !m)}
+          title={panMode ? "Switch to edit mode (drag nodes)" : "Switch to pan/zoom mode"}
+          className={`text-[11px] px-2 py-1 rounded border transition-all ${
+            panMode
+              ? "border-plasma-magenta/60 bg-graphite/80 text-plasma-magenta hover:border-plasma-magenta"
+              : "border-white/20 bg-graphite/80 text-text-muted hover:border-white/40"
+          }`}
         >
-          ⛶ Reset
+          {panMode ? "↖ Editar" : "✥ Pan"}
         </button>
-      )}
+      </div>
       <div
         id={domId}
         ref={ref}

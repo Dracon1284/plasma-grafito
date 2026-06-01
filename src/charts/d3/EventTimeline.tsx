@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 import type { ChartDefinition, ChartProps } from "../types";
 
@@ -69,6 +69,7 @@ export const eventTimelineDefinition: Omit<ChartDefinition, "renderComponent"> =
         { value: "hour",  label: "Hour"  },
       ],
     },
+    { key: "fitText",     label: "Expand cards to fit text", type: "boolean", default: false,        group: "Estilo" },
     { key: "lineColor",   label: "Axis line color",       type: "color",   default: "#00F0FF",     group: "Estilo" },
     {
       key: "palette",     label: "Palette",              type: "select",  default: "plasma",
@@ -169,8 +170,8 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef  = useRef<SVGSVGElement>(null);
   const panRef  = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  // Reset pan whenever data/mapping changes (not on option-only changes)
   const dataKeyRef = useRef<string>("");
+  const [zoomK, setZoomK] = useState(1);
 
   useEffect(() => {
     if (!svgRef.current || !wrapRef.current) return;
@@ -219,6 +220,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
     const dateFormat  = (options.dateFormat as string) || "auto";
     const showScale   = options.showScale === true;
     const scaleUnit   = (options.scaleUnit as string) || "year";
+    const fitText     = options.fitText === true;
 
     const colorFor = (title: string, i: number) =>
       useCustom && custom[title] ? custom[title] : palette[i % palette.length];
@@ -237,6 +239,19 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
     const CARD_W   = 124;
     // Card height: top-pad + title + gap + max desc lines + bottom-pad
     const CARD_H   = PAD_T + TITLE_PX + 4 + MAX_LINES * LINE_H + PAD_B; // 7+12+4+52+8 = 83
+
+    // ── fitText layout constants (after CARD_W / MAX_LINES / CARD_H are defined) ──
+    const CARD_W_EFF      = fitText ? 160 : CARD_W;
+    const MAX_CHARS       = fitText ? 26  : 20;
+    const MAX_LINES_EFF   = fitText ? 8   : MAX_LINES;
+    const MAX_TITLE_CHARS = fitText ? 30  : 22;
+
+    // Pre-compute per-event card heights (variable when fitText=true)
+    const eventLayouts = events.map((ev) => {
+      const lines = wrapText(ev.desc, MAX_CHARS).slice(0, MAX_LINES_EFF);
+      const h = PAD_T + TITLE_PX + (lines.length > 0 ? 4 + lines.length * LINE_H : 0) + PAD_B;
+      return { lines, cardH: Math.max(CARD_H, h) };
+    });
 
     // ── Draw ──────────────────────────────────────────────────────────────────
     const svg = d3.select(svgRef.current);
@@ -260,22 +275,17 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
 
     if (isH) {
       // ── HORIZONTAL ─────────────────────────────────────────────────────────
-      //
-      // Layout (y-axis):
-      //   titleH                         ← chart title (if any)
-      //   CARD_H + GAP + connLen         ← space for above-cards
-      //   midY                           ← the horizontal axis line
-      //   connLen + GAP + CARD_H         ← space for below-cards
-      //   + bottom margin
-      //
-      const midY = titleH + CARD_H + GAP + connLen + 4;
-      const H    = midY + connLen + GAP + CARD_H + 14;
+      // Compute per-event card heights for above/below rows
+      const aboveMaxH = Math.max(CARD_H, ...eventLayouts.filter((_, i) => i % 2 === 0).map((l) => l.cardH));
+      const belowMaxH = Math.max(CARD_H, ...eventLayouts.filter((_, i) => i % 2 !== 0).map((l) => l.cardH));
 
-      // Spacing: try to center; fall back to 130px min
+      const midY = titleH + aboveMaxH + GAP + connLen + 4;
+      const H    = midY + connLen + GAP + belowMaxH + 14;
+
+      // Spacing: try to center; fall back to 130px min; scaled by zoomK
       const idealSpacing = Math.round((W - 120) / Math.max(events.length - 1, 1));
-      const spacing = Math.max(130, idealSpacing);
+      const spacing = Math.max(130, idealSpacing) * zoomK;
       const totalW  = (events.length - 1) * spacing;
-      // padX: center events if they fit, else start at 60px
       const padX = Math.round(Math.max(60, (W - totalW) / 2));
 
       svg.attr("width", W).attr("height", H).style("background", bg.bg);
@@ -302,7 +312,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         const x     = padX + i * spacing;
         const above = i % 2 === 0;
         const color = colorFor(ev.title, ev.i);
-        const lines = wrapText(ev.desc);
+        const { lines, cardH: thisCardH } = eventLayouts[i];
 
         // Dot: inner filled + outer ring
         g.append("circle").attr("cx", x).attr("cy", midY).attr("r", 10)
@@ -310,7 +320,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         g.append("circle").attr("cx", x).attr("cy", midY).attr("r", 6)
           .attr("fill", color).attr("stroke", bg.bg).attr("stroke-width", 2);
 
-        // Date label: on the line-facing side of the dot (not toward card)
+        // Date label
         const dateLabelY = above ? midY + 16 : midY - 13;
         g.append("text")
           .attr("x", x).attr("y", dateLabelY)
@@ -327,20 +337,16 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .attr("x1", x).attr("x2", x).attr("y1", cStart).attr("y2", cEnd)
           .attr("stroke", color).attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3");
 
-        // Card rect — positioned so title starts at PAD_T from card top
-        // above: card bottom = cEnd - GAP, card top = cEnd - GAP - CARD_H
-        // below: card top = cEnd + GAP,    card bottom = cEnd + GAP + CARD_H
-        const cardY   = above ? cEnd - GAP - CARD_H : cEnd + GAP;
-        const titleY  = cardY + PAD_T + TITLE_PX;  // SVG text baseline
+        const cardY  = above ? cEnd - GAP - thisCardH : cEnd + GAP;
+        const titleY = cardY + PAD_T + TITLE_PX;
 
         g.append("rect")
-          .attr("x", x - CARD_W / 2 - 5).attr("y", cardY)
-          .attr("width", CARD_W + 10).attr("height", CARD_H)
+          .attr("x", x - CARD_W_EFF / 2 - 5).attr("y", cardY)
+          .attr("width", CARD_W_EFF + 10).attr("height", thisCardH)
           .attr("fill", bg.bg).attr("opacity", 0.3)
           .attr("stroke", color).attr("stroke-width", 0.5).attr("stroke-opacity", 0.4)
           .attr("rx", 3);
 
-        // Event title
         g.append("text")
           .attr("x", x).attr("y", titleY)
           .attr("text-anchor", "middle")
@@ -349,9 +355,8 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .style("font-weight", titleBold ? "700" : "400")
           .style("font-style", titleItalic ? "italic" : "normal")
           .style("fill", bg.text)
-          .text(ev.title.length > 22 ? ev.title.slice(0, 20) + "…" : ev.title);
+          .text(ev.title.length > MAX_TITLE_CHARS ? ev.title.slice(0, MAX_TITLE_CHARS - 2) + "…" : ev.title);
 
-        // Description lines
         const descBaseY = titleY + 4 + DESC_PX;
         lines.forEach((line, li) => {
           g.append("text")
@@ -372,11 +377,15 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         if (!isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime()) && firstDate < lastDate) {
           const x0 = padX;
           const x1 = padX + (events.length - 1) * spacing;
-          const dateScale = d3.scaleTime().domain([firstDate, lastDate]).range([x0, x1]);
           const intervalMap: Record<string, d3.CountableTimeInterval> = {
             year: d3.timeYear, month: d3.timeMonth, day: d3.timeDay, hour: d3.timeHour,
           };
-          const tickInterval = (intervalMap[scaleUnit] || d3.timeYear).every(1);
+          const interval = intervalMap[scaleUnit] || d3.timeYear;
+          // Extend domain to interval boundaries so first/last ticks always appear
+          const d0 = interval.floor(firstDate);
+          const d1 = interval.ceil(lastDate);
+          const dateScale = d3.scaleTime().domain([d0, d1]).range([x0, x1]);
+          const tickInterval = interval.every(1);
           const ticks = (tickInterval ? dateScale.ticks(tickInterval) : dateScale.ticks(10)).slice(0, 40);
           ticks.forEach((tick) => {
             const tx = dateScale(tick);
@@ -416,11 +425,12 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
       //   lineX                          ← the vertical axis line
       //   connLen + GAP + CARD_W         ← right-card area
       //
-      const lineX   = Math.round(W / 2);
-      const spacing = 138;
-      const padY    = titleH + CARD_H / 2 + 20;
-      const totalH  = Math.max(460, titleH + events.length * spacing + 80);
-      const H       = totalH;
+      const lineX    = Math.round(W / 2);
+      const maxCardH = Math.max(CARD_H, ...eventLayouts.map((l) => l.cardH));
+      const spacing  = Math.max(138, maxCardH + 30) * zoomK;
+      const padY     = titleH + maxCardH / 2 + 20;
+      const totalH   = Math.max(460, titleH + events.length * spacing + 80);
+      const H        = totalH;
 
       svg.attr("width", W).attr("height", H).style("background", bg.bg);
 
@@ -445,7 +455,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         const y       = padY + i * spacing;
         const toRight = i % 2 === 0;
         const color   = colorFor(ev.title, ev.i);
-        const lines   = wrapText(ev.desc);
+        const { lines, cardH: thisCardH } = eventLayouts[i];
 
         // Dot
         g.append("circle").attr("cx", lineX).attr("cy", y).attr("r", 10)
@@ -471,15 +481,15 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .attr("stroke", color).attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3");
 
         // Card — vertically centered on event y
-        const cardTop  = y - CARD_H / 2;
-        const cardLeft = toRight ? cxEnd + GAP : cxEnd - GAP - CARD_W - 10;
+        const cardTop  = y - thisCardH / 2;
+        const cardLeft = toRight ? cxEnd + GAP : cxEnd - GAP - CARD_W_EFF - 10;
         const titleY   = cardTop + PAD_T + TITLE_PX;
         const textX    = toRight ? cxEnd + GAP + 7 : cxEnd - GAP - 7;
         const anchor   = toRight ? "start" : "end";
 
         g.append("rect")
           .attr("x", cardLeft - 2).attr("y", cardTop)
-          .attr("width", CARD_W + 10).attr("height", CARD_H)
+          .attr("width", CARD_W_EFF + 10).attr("height", thisCardH)
           .attr("fill", bg.bg).attr("opacity", 0.3)
           .attr("stroke", color).attr("stroke-width", 0.5).attr("stroke-opacity", 0.4)
           .attr("rx", 3);
@@ -492,7 +502,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .style("font-weight", titleBold ? "700" : "400")
           .style("font-style", titleItalic ? "italic" : "normal")
           .style("fill", bg.text)
-          .text(ev.title.length > 20 ? ev.title.slice(0, 18) + "…" : ev.title);
+          .text(ev.title.length > MAX_TITLE_CHARS ? ev.title.slice(0, MAX_TITLE_CHARS - 2) + "…" : ev.title);
 
         const descBaseY = titleY + 4 + DESC_PX;
         lines.forEach((line, li) => {
@@ -514,11 +524,14 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         if (!isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime()) && firstDate < lastDate) {
           const y0 = padY;
           const y1 = padY + (events.length - 1) * spacing;
-          const dateScale = d3.scaleTime().domain([firstDate, lastDate]).range([y0, y1]);
           const intervalMap: Record<string, d3.CountableTimeInterval> = {
             year: d3.timeYear, month: d3.timeMonth, day: d3.timeDay, hour: d3.timeHour,
           };
-          const tickInterval = (intervalMap[scaleUnit] || d3.timeYear).every(1);
+          const interval = intervalMap[scaleUnit] || d3.timeYear;
+          const d0 = interval.floor(firstDate);
+          const d1 = interval.ceil(lastDate);
+          const dateScale = d3.scaleTime().domain([d0, d1]).range([y0, y1]);
+          const tickInterval = interval.every(1);
           const ticks = (tickInterval ? dateScale.ticks(tickInterval) : dateScale.ticks(10)).slice(0, 40);
           ticks.forEach((tick) => {
             const ty = dateScale(tick);
@@ -550,15 +563,45 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
             .on("end", function () { d3.select(this).style("cursor", "grab"); })
         );
     }
-  }, [data, mapping, options]);
+  }, [data, mapping, options, zoomK]);
+
+  const btnClass =
+    "text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all";
 
   return (
     <div
       id={domId}
       ref={wrapRef}
-      className="w-full h-full min-h-[420px] overflow-hidden select-none"
+      className="relative w-full h-full min-h-[420px] overflow-hidden select-none"
     >
       <svg ref={svgRef} className="w-full" />
+      {/* Zoom / reset toolbar */}
+      <div className="absolute top-2 right-2 flex gap-1 z-10">
+        <button
+          type="button"
+          className={btnClass}
+          title="Zoom in"
+          onClick={() => setZoomK((k) => Math.min(4, parseFloat((k + 0.25).toFixed(2))))}
+        >
+          ＋
+        </button>
+        <button
+          type="button"
+          className={btnClass}
+          title="Zoom out"
+          onClick={() => setZoomK((k) => Math.max(0.25, parseFloat((k - 0.25).toFixed(2))))}
+        >
+          －
+        </button>
+        <button
+          type="button"
+          className={btnClass}
+          title="Reset view"
+          onClick={() => { panRef.current = { x: 0, y: 0 }; setZoomK(1); }}
+        >
+          ⛶
+        </button>
+      </div>
     </div>
   );
 }
