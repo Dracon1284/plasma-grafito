@@ -151,6 +151,7 @@ const fr = {
         titleItalic:  "Titre en italique",
         descItalic:   "Description en italique",
         connLen:      "Longueur du connecteur (px)",
+        lineColor:    "Couleur de la ligne centrale",
         customColors: "Couleurs par événement",
       },
     },

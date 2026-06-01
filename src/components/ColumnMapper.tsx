@@ -17,6 +17,8 @@ function inferDType(values: (string | number | null)[]): DType {
 
 function compatible(want: DType, have: DType): boolean {
   if (want === "category" || want === "string") return true;
+  // "date" columns are stored as strings after parsing (YYYY-MM-DD), so accept string columns
+  if (want === "date") return have === "string" || have === "date";
   return want === have;
 }
 

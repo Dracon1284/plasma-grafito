@@ -151,6 +151,7 @@ const es = {
         titleItalic:  "Título en cursiva",
         descItalic:   "Descripción en cursiva",
         connLen:      "Longitud del conector (px)",
+        lineColor:    "Color de la línea central",
         customColors: "Colores por evento",
       },
     },

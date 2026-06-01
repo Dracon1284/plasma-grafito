@@ -48,6 +48,7 @@ export const eventTimelineDefinition: Omit<ChartDefinition, "renderComponent"> =
     { key: "titleBold",   label: "Title bold",           type: "boolean", default: true,          group: "Estilo" },
     { key: "titleItalic", label: "Title italic",         type: "boolean", default: false,         group: "Estilo" },
     { key: "descItalic",  label: "Description italic",   type: "boolean", default: false,         group: "Estilo" },
+    { key: "lineColor",   label: "Axis line color",       type: "color",   default: "#00F0FF",     group: "Estilo" },
     {
       key: "palette",     label: "Palette",              type: "select",  default: "plasma",
       options: [
@@ -190,7 +191,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
     svg.selectAll("*").remove();
 
     // Arrow markers
-    const lineColor = palette[0];
+    const lineColor = (options.lineColor as string) || palette[0];
     const defs = svg.append("defs");
     [
       { id: "et-r", pts: "0 0,8 3,0 6", mw: 8, mh: 6, rx: 7, ry: 3, orient: "auto" },

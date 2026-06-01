@@ -151,6 +151,7 @@ const en = {
         titleItalic:  "Title italic",
         descItalic:   "Description italic",
         connLen:      "Connector length (px)",
+        lineColor:    "Axis line color",
         customColors: "Colors by event",
       },
     },
