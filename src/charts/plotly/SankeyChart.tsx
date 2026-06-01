@@ -107,6 +107,12 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
 
   const resetView = useCallback(() => setView({ x: 0, y: 0, k: 1 }), []);
 
+  // Al salir del modo pan, resetear la vista para que el chart
+  // vuelva a mostrarse completo en modo edición
+  useEffect(() => {
+    if (!panMode) resetView();
+  }, [panMode, resetView]);
+
   const zoomCenter = useCallback((factor: number) => {
     const el = wrapRef.current;
     if (!el) return;
@@ -246,6 +252,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
 
   return (
     <div
+      id={domId}
       ref={wrapRef}
       className={`relative w-full h-full min-h-[620px] overflow-hidden select-none ${panMode ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
       onMouseDown={onMouseDown}
@@ -299,7 +306,6 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
         </button>
       </div>
       <div
-        id={domId}
         ref={ref}
         className="w-full h-full min-h-[620px]"
         style={{

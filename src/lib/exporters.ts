@@ -16,8 +16,15 @@ function download(blob: Blob, filename: string) {
 async function captureDataURL(domId: string, bgColor = "#0A0A0A"): Promise<string> {
   const el = document.getElementById(domId);
   if (!el) throw new Error("No se encontró el canvas del gráfico");
-  if ((el as any).layout || el.querySelector(".js-plotly-plot")) {
-    return Plotly.toImage(el as any, {
+
+  // el puede ser el propio div de Plotly (js-plotly-plot) o contenerlo como hijo
+  const plotlyEl: HTMLElement | null =
+    el.classList.contains("js-plotly-plot")
+      ? el
+      : el.querySelector<HTMLElement>(".js-plotly-plot");
+
+  if (plotlyEl && (plotlyEl as any)._fullLayout) {
+    return Plotly.toImage(plotlyEl as any, {
       format: "png",
       width: 1600,
       height: 1000,
