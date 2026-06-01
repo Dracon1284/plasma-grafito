@@ -31,6 +31,8 @@ export const sankeyDefinition: Omit<ChartDefinition, "renderComponent"> = {
   optionsSchema: [
     { key: "title", label: "Título", type: "text", default: "", group: "Referencias" },
     { key: "showLegend", label: "Mostrar etiquetas en nodos", type: "boolean", default: true, group: "Referencias" },
+    { key: "nodePad", label: "Separación entre nodos (px)", type: "number", default: 40, group: "Estilo" },
+    { key: "nodeThickness", label: "Grosor de nodos (px)", type: "number", default: 20, group: "Estilo" },
     {
       key: "palette",
       label: "Paleta de colores",
@@ -104,6 +106,17 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
   });
 
   const resetView = useCallback(() => setView({ x: 0, y: 0, k: 1 }), []);
+
+  const zoomCenter = useCallback((factor: number) => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const cx = el.clientWidth / 2;
+    const cy = el.clientHeight / 2;
+    setView((v) => {
+      const nk = Math.max(0.4, Math.min(8, v.k * factor));
+      return { k: nk, x: cx - (cx - v.x) * (nk / v.k), y: cy - (cy - v.y) * (nk / v.k) };
+    });
+  }, []);
 
   // Listener de rueda nativo (non-passive) para poder usar preventDefault
   useEffect(() => {
@@ -184,8 +197,10 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
     const title = (options.title as string) || "";
     const showLabels = options.showLegend !== false;
 
-    const bgKey = (options.bgColor as string) || "black";
-    const bg = bgColorMap[bgKey] ?? bgColorMap.black;
+    const bgKey       = (options.bgColor       as string) || "black";
+    const bg          = bgColorMap[bgKey] ?? bgColorMap.black;
+    const nodePad     = Math.max(5,  Math.min(120, Number(options.nodePad)       || 40));
+    const nodeThick   = Math.max(5,  Math.min(60,  Number(options.nodeThickness) || 20));
 
     Plotly.react(
       ref.current,
@@ -196,8 +211,8 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
           node: {
             label: showLabels ? labels : labels.map(() => ""),
             color: nodeColors,
-            pad: 18,
-            thickness: 18,
+            pad: nodePad,
+            thickness: nodeThick,
             line: { color: bg.nodeBorder, width: 1 },
           },
           link: {
@@ -232,7 +247,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
   return (
     <div
       ref={wrapRef}
-      className={`relative w-full h-full min-h-[500px] overflow-hidden select-none ${panMode ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
+      className={`relative w-full h-full min-h-[620px] overflow-hidden select-none ${panMode ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={endDrag}
@@ -241,6 +256,24 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
     >
       {/* Toolbar */}
       <div className="absolute top-2 right-2 z-10 flex gap-1">
+        {panMode && (
+          <>
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => zoomCenter(1.25)}
+              title="Zoom in"
+              className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+            >＋</button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => zoomCenter(1 / 1.25)}
+              title="Zoom out"
+              className="text-[11px] px-2 py-1 rounded border border-plasma-blue/40 bg-graphite/80 text-text-neon hover:border-plasma-blue hover:shadow-glow-blue transition-all"
+            >－</button>
+          </>
+        )}
         {(view.k !== 1 || view.x !== 0 || view.y !== 0) && (
           <button
             type="button"
@@ -255,7 +288,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
           type="button"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={() => setPanMode((m) => !m)}
-          title={panMode ? "Switch to edit mode (drag nodes)" : "Switch to pan/zoom mode"}
+          title={panMode ? "Volver al modo edición (arrastrar nodos)" : "Activar modo pan/zoom"}
           className={`text-[11px] px-2 py-1 rounded border transition-all ${
             panMode
               ? "border-plasma-magenta/60 bg-graphite/80 text-plasma-magenta hover:border-plasma-magenta"
@@ -268,7 +301,7 @@ export default function SankeyChart({ data, mapping, options, domId }: ChartProp
       <div
         id={domId}
         ref={ref}
-        className="w-full h-full min-h-[500px]"
+        className="w-full h-full min-h-[620px]"
         style={{
           transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`,
           transformOrigin: "0 0",

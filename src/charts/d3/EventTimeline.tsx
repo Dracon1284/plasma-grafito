@@ -65,8 +65,6 @@ export const eventTimelineDefinition: Omit<ChartDefinition, "renderComponent"> =
       options: [
         { value: "year",  label: "Year"  },
         { value: "month", label: "Month" },
-        { value: "day",   label: "Day"   },
-        { value: "hour",  label: "Hour"  },
       ],
     },
     { key: "fitText",     label: "Expand cards to fit text", type: "boolean", default: false,        group: "Estilo" },
@@ -378,7 +376,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           const x0 = padX;
           const x1 = padX + (events.length - 1) * spacing;
           const intervalMap: Record<string, d3.CountableTimeInterval> = {
-            year: d3.timeYear, month: d3.timeMonth, day: d3.timeDay, hour: d3.timeHour,
+            year: d3.timeYear, month: d3.timeMonth,
           };
           const interval = intervalMap[scaleUnit] || d3.timeYear;
           // Extend domain to interval boundaries so first/last ticks always appear
@@ -525,7 +523,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           const y0 = padY;
           const y1 = padY + (events.length - 1) * spacing;
           const intervalMap: Record<string, d3.CountableTimeInterval> = {
-            year: d3.timeYear, month: d3.timeMonth, day: d3.timeDay, hour: d3.timeHour,
+            year: d3.timeYear, month: d3.timeMonth,
           };
           const interval = intervalMap[scaleUnit] || d3.timeYear;
           const d0 = interval.floor(firstDate);
