@@ -67,6 +67,10 @@ export const eventTimelineDefinition: Omit<ChartDefinition, "renderComponent"> =
         { value: "month", label: "Month" },
       ],
     },
+    {
+      key: "scalePos", label: "Position events to scale", type: "boolean", default: false,
+      group: "Estilo", dependsOn: { key: "showScale", equals: true },
+    },
     { key: "fitText",     label: "Expand cards to fit text", type: "boolean", default: false,        group: "Estilo" },
     { key: "lineColor",   label: "Axis line color",       type: "color",   default: "#00F0FF",     group: "Estilo" },
     {
@@ -218,7 +222,13 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
     const dateFormat  = (options.dateFormat as string) || "auto";
     const showScale   = options.showScale === true;
     const scaleUnit   = (options.scaleUnit as string) || "year";
+    const scalePos    = options.scalePos === true;
     const fitText     = options.fitText === true;
+
+    // Shared time-scale interval lookup
+    const intervalMap: Record<string, d3.CountableTimeInterval> = {
+      year: d3.timeYear, month: d3.timeMonth,
+    };
 
     const colorFor = (title: string, i: number) =>
       useCustom && custom[title] ? custom[title] : palette[i % palette.length];
@@ -306,8 +316,28 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         .attr("stroke", lineColor).attr("stroke-width", 2.2).attr("opacity", 0.5)
         .attr("marker-end", "url(#et-r)").attr("marker-start", "url(#et-l)");
 
+      // ── Time scale (shared by tick marks and optional event positioning) ──────
+      const firstDateH = new Date(events[0].date);
+      const lastDateH  = new Date(events[events.length - 1].date);
+      const datesValidH = events.length >= 2
+        && !isNaN(firstDateH.getTime()) && !isNaN(lastDateH.getTime())
+        && firstDateH < lastDateH;
+      const x0 = padX;
+      const x1 = padX + totalW;
+      let dateScaleH: d3.ScaleTime<number, number> | null = null;
+      if (showScale && datesValidH) {
+        const interval = intervalMap[scaleUnit] || d3.timeYear;
+        const d0 = interval.floor(firstDateH);
+        const d1 = interval.ceil(lastDateH);
+        dateScaleH = d3.scaleTime().domain([d0, d1]).range([x0, x1]);
+      }
+      // When scalePos is on, place events at their true temporal x
+      const useScalePosH = scalePos && dateScaleH != null;
+      const xFor = (ev: { date: string }, i: number) =>
+        useScalePosH ? dateScaleH!(new Date(ev.date)) : padX + i * spacing;
+
       events.forEach((ev, i) => {
-        const x     = padX + i * spacing;
+        const x     = xFor(ev, i);
         const above = i % 2 === 0;
         const color = colorFor(ev.title, ev.i);
         const { lines, cardH: thisCardH } = eventLayouts[i];
@@ -369,20 +399,10 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
       });
 
       // Time scale ticks
-      if (showScale && events.length >= 2) {
-        const firstDate = new Date(events[0].date);
-        const lastDate  = new Date(events[events.length - 1].date);
-        if (!isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime()) && firstDate < lastDate) {
-          const x0 = padX;
-          const x1 = padX + (events.length - 1) * spacing;
-          const intervalMap: Record<string, d3.CountableTimeInterval> = {
-            year: d3.timeYear, month: d3.timeMonth,
-          };
+      if (dateScaleH) {
+        {
+          const dateScale = dateScaleH;
           const interval = intervalMap[scaleUnit] || d3.timeYear;
-          // Extend domain to interval boundaries so first/last ticks always appear
-          const d0 = interval.floor(firstDate);
-          const d1 = interval.ceil(lastDate);
-          const dateScale = d3.scaleTime().domain([d0, d1]).range([x0, x1]);
           const tickInterval = interval.every(1);
           const ticks = (tickInterval ? dateScale.ticks(tickInterval) : dateScale.ticks(10)).slice(0, 40);
           ticks.forEach((tick) => {
@@ -449,8 +469,27 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         .attr("stroke", lineColor).attr("stroke-width", 2.2).attr("opacity", 0.5)
         .attr("marker-end", "url(#et-d)").attr("marker-start", "url(#et-u)");
 
+      // ── Time scale (shared by tick marks and optional event positioning) ──────
+      const firstDateV = new Date(events[0].date);
+      const lastDateV  = new Date(events[events.length - 1].date);
+      const datesValidV = events.length >= 2
+        && !isNaN(firstDateV.getTime()) && !isNaN(lastDateV.getTime())
+        && firstDateV < lastDateV;
+      const y0 = padY;
+      const y1 = padY + (events.length - 1) * spacing;
+      let dateScaleV: d3.ScaleTime<number, number> | null = null;
+      if (showScale && datesValidV) {
+        const interval = intervalMap[scaleUnit] || d3.timeYear;
+        const d0 = interval.floor(firstDateV);
+        const d1 = interval.ceil(lastDateV);
+        dateScaleV = d3.scaleTime().domain([d0, d1]).range([y0, y1]);
+      }
+      const useScalePosV = scalePos && dateScaleV != null;
+      const yFor = (ev: { date: string }, i: number) =>
+        useScalePosV ? dateScaleV!(new Date(ev.date)) : padY + i * spacing;
+
       events.forEach((ev, i) => {
-        const y       = padY + i * spacing;
+        const y       = yFor(ev, i);
         const toRight = i % 2 === 0;
         const color   = colorFor(ev.title, ev.i);
         const { lines, cardH: thisCardH } = eventLayouts[i];
@@ -516,19 +555,10 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
       });
 
       // Time scale ticks
-      if (showScale && events.length >= 2) {
-        const firstDate = new Date(events[0].date);
-        const lastDate  = new Date(events[events.length - 1].date);
-        if (!isNaN(firstDate.getTime()) && !isNaN(lastDate.getTime()) && firstDate < lastDate) {
-          const y0 = padY;
-          const y1 = padY + (events.length - 1) * spacing;
-          const intervalMap: Record<string, d3.CountableTimeInterval> = {
-            year: d3.timeYear, month: d3.timeMonth,
-          };
+      if (dateScaleV) {
+        {
+          const dateScale = dateScaleV;
           const interval = intervalMap[scaleUnit] || d3.timeYear;
-          const d0 = interval.floor(firstDate);
-          const d1 = interval.ceil(lastDate);
-          const dateScale = d3.scaleTime().domain([d0, d1]).range([y0, y1]);
           const tickInterval = interval.every(1);
           const ticks = (tickInterval ? dateScale.ticks(tickInterval) : dateScale.ticks(10)).slice(0, 40);
           ticks.forEach((tick) => {

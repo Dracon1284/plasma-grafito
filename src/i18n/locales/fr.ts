@@ -154,6 +154,7 @@ const fr = {
         dateFormat:   "Format de la date",
         showScale:    "Afficher l'échelle de temps",
         scaleUnit:    "Unité d'échelle",
+        scalePos:     "Positionner les événements à l'échelle",
         fitText:      "Agrandir les cartes pour le texte",
         lineColor:    "Couleur de la ligne centrale",
         customColors: "Couleurs par événement",

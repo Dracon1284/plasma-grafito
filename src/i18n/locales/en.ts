@@ -154,6 +154,7 @@ const en = {
         dateFormat:   "Date label format",
         showScale:    "Show time scale",
         scaleUnit:    "Scale unit",
+        scalePos:     "Position events to scale",
         fitText:      "Expand cards to fit text",
         lineColor:    "Axis line color",
         customColors: "Colors by event",
