@@ -151,7 +151,7 @@ function scaleTickLabel(d: Date, unit: string): string {
 
 // ── Text-wrap helper ──────────────────────────────────────────────────────────
 
-function wrapText(text: string, charsPerLine = 20): string[] {
+function wrapText(text: string, charsPerLine = 20, maxLines = 4): string[] {
   if (!text) return [];
   const words = text.split(" ");
   const lines: string[] = [];
@@ -163,7 +163,44 @@ function wrapText(text: string, charsPerLine = 20): string[] {
     cur = w.length > charsPerLine ? w.slice(0, charsPerLine - 1) + "…" : w;
   }
   if (cur) lines.push(cur);
-  return lines.slice(0, 4);
+  if (lines.length <= maxLines) return lines;
+  // Truncate and mark the last visible line with an ellipsis
+  const trimmed = lines.slice(0, maxLines);
+  const last = trimmed[maxLines - 1];
+  trimmed[maxLines - 1] = last.length > charsPerLine - 1
+    ? last.slice(0, charsPerLine - 1) + "…"
+    : last + " …";
+  return trimmed;
+}
+
+// Greedy level assignment for collision-aware stacking.
+// items: each has a coordinate along the axis and an extent (size along axis).
+// Returns idx → level (0 = nearest the axis). Items that would overlap an
+// already-placed item on a level get bumped to the next free level.
+function assignLevels(
+  items: { coord: number; extent: number; idx: number }[],
+  gap: number,
+): Record<number, number> {
+  const lastEnd: number[] = []; // far edge of last item placed on each level
+  const level: Record<number, number> = {};
+  const sorted = [...items].sort((a, b) => a.coord - b.coord);
+  for (const it of sorted) {
+    const start = it.coord - it.extent / 2;
+    let placed = false;
+    for (let l = 0; l < lastEnd.length; l++) {
+      if (start >= lastEnd[l] + gap) {
+        level[it.idx] = l;
+        lastEnd[l] = it.coord + it.extent / 2;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      level[it.idx] = lastEnd.length;
+      lastEnd.push(it.coord + it.extent / 2);
+    }
+  }
+  return level;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -251,14 +288,22 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
     // ── fitText layout constants (after CARD_W / MAX_LINES / CARD_H are defined) ──
     const CARD_W_EFF      = fitText ? 160 : CARD_W;
     const MAX_CHARS       = fitText ? 26  : 20;
-    const MAX_LINES_EFF   = fitText ? 8   : MAX_LINES;
-    const MAX_TITLE_CHARS = fitText ? 30  : 22;
+    // When fitText is on, show ALL the text (no truncation) so long
+    // descriptions (e.g. 250 words) fit fully; otherwise cap at MAX_LINES.
+    const MAX_LINES_EFF   = fitText ? 1000 : MAX_LINES;
+    const TITLE_CHARS     = fitText ? 24  : 22;
+    const TITLE_MAX_LINES = fitText ? 6   : 1;
+    const TITLE_LINE_H    = TITLE_PX + 3; // 15px
 
-    // Pre-compute per-event card heights (variable when fitText=true)
+    // Pre-compute per-event card geometry (variable when fitText=true)
     const eventLayouts = events.map((ev) => {
-      const lines = wrapText(ev.desc, MAX_CHARS).slice(0, MAX_LINES_EFF);
-      const h = PAD_T + TITLE_PX + (lines.length > 0 ? 4 + lines.length * LINE_H : 0) + PAD_B;
-      return { lines, cardH: Math.max(CARD_H, h) };
+      const titleLines = fitText
+        ? wrapText(ev.title, TITLE_CHARS, TITLE_MAX_LINES)
+        : [ev.title.length > TITLE_CHARS ? ev.title.slice(0, TITLE_CHARS - 2) + "…" : ev.title];
+      const lines = wrapText(ev.desc, MAX_CHARS, MAX_LINES_EFF);
+      const titleBlockH = titleLines.length * TITLE_LINE_H;
+      const h = PAD_T + titleBlockH + (lines.length > 0 ? 4 + lines.length * LINE_H : 0) + PAD_B;
+      return { titleLines, lines, cardH: Math.max(CARD_H, h) };
     });
 
     // ── Draw ──────────────────────────────────────────────────────────────────
@@ -283,18 +328,52 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
 
     if (isH) {
       // ── HORIZONTAL ─────────────────────────────────────────────────────────
-      // Compute per-event card heights for above/below rows
-      const aboveMaxH = Math.max(CARD_H, ...eventLayouts.filter((_, i) => i % 2 === 0).map((l) => l.cardH));
-      const belowMaxH = Math.max(CARD_H, ...eventLayouts.filter((_, i) => i % 2 !== 0).map((l) => l.cardH));
-
-      const midY = titleH + aboveMaxH + GAP + connLen + 4;
-      const H    = midY + connLen + GAP + belowMaxH + 14;
-
       // Spacing: try to center; fall back to 130px min; scaled by zoomK
       const idealSpacing = Math.round((W - 120) / Math.max(events.length - 1, 1));
       const spacing = Math.max(130, idealSpacing) * zoomK;
       const totalW  = (events.length - 1) * spacing;
       const padX = Math.round(Math.max(60, (W - totalW) / 2));
+
+      // ── Time scale (shared by tick marks and optional event positioning) ──────
+      const firstDateH = new Date(events[0].date);
+      const lastDateH  = new Date(events[events.length - 1].date);
+      const datesValidH = events.length >= 2
+        && !isNaN(firstDateH.getTime()) && !isNaN(lastDateH.getTime())
+        && firstDateH < lastDateH;
+      const x0 = padX;
+      const x1 = padX + totalW;
+      let dateScaleH: d3.ScaleTime<number, number> | null = null;
+      if (showScale && datesValidH) {
+        const interval = intervalMap[scaleUnit] || d3.timeYear;
+        const d0 = interval.floor(firstDateH);
+        const d1 = interval.ceil(lastDateH);
+        dateScaleH = d3.scaleTime().domain([d0, d1]).range([x0, x1]);
+      }
+      // When scalePos is on, place events at their true temporal x
+      const useScalePosH = scalePos && dateScaleH != null;
+      const xPos = events.map((ev, i) =>
+        useScalePosH ? dateScaleH!(new Date(ev.date)) : padX + i * spacing);
+
+      // ── Collision-aware stacking: cards on the same side that overlap in x get
+      //    pushed to a further "level" (longer connector) so they don't overlap.
+      const cardExtent = CARD_W_EFF + 14;
+      const aboveItems = events
+        .map((_, i) => ({ coord: xPos[i], extent: cardExtent, idx: i }))
+        .filter((_, i) => i % 2 === 0);
+      const belowItems = events
+        .map((_, i) => ({ coord: xPos[i], extent: cardExtent, idx: i }))
+        .filter((_, i) => i % 2 !== 0);
+      const levelMap = { ...assignLevels(aboveItems, 6), ...assignLevels(belowItems, 6) };
+
+      const aboveMaxH = Math.max(CARD_H, ...eventLayouts.filter((_, i) => i % 2 === 0).map((l) => l.cardH));
+      const belowMaxH = Math.max(CARD_H, ...eventLayouts.filter((_, i) => i % 2 !== 0).map((l) => l.cardH));
+      const stepAbove = aboveMaxH + 12;
+      const stepBelow = belowMaxH + 12;
+      const maxAboveLvl = aboveItems.reduce((m, it) => Math.max(m, levelMap[it.idx]), 0);
+      const maxBelowLvl = belowItems.reduce((m, it) => Math.max(m, levelMap[it.idx]), 0);
+
+      const midY = titleH + connLen + GAP + aboveMaxH + maxAboveLvl * stepAbove + 4;
+      const H    = midY + connLen + GAP + belowMaxH + maxBelowLvl * stepBelow + 14;
 
       svg.attr("width", W).attr("height", H).style("background", bg.bg);
 
@@ -316,31 +395,13 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         .attr("stroke", lineColor).attr("stroke-width", 2.2).attr("opacity", 0.5)
         .attr("marker-end", "url(#et-r)").attr("marker-start", "url(#et-l)");
 
-      // ── Time scale (shared by tick marks and optional event positioning) ──────
-      const firstDateH = new Date(events[0].date);
-      const lastDateH  = new Date(events[events.length - 1].date);
-      const datesValidH = events.length >= 2
-        && !isNaN(firstDateH.getTime()) && !isNaN(lastDateH.getTime())
-        && firstDateH < lastDateH;
-      const x0 = padX;
-      const x1 = padX + totalW;
-      let dateScaleH: d3.ScaleTime<number, number> | null = null;
-      if (showScale && datesValidH) {
-        const interval = intervalMap[scaleUnit] || d3.timeYear;
-        const d0 = interval.floor(firstDateH);
-        const d1 = interval.ceil(lastDateH);
-        dateScaleH = d3.scaleTime().domain([d0, d1]).range([x0, x1]);
-      }
-      // When scalePos is on, place events at their true temporal x
-      const useScalePosH = scalePos && dateScaleH != null;
-      const xFor = (ev: { date: string }, i: number) =>
-        useScalePosH ? dateScaleH!(new Date(ev.date)) : padX + i * spacing;
-
       events.forEach((ev, i) => {
-        const x     = xFor(ev, i);
+        const x     = xPos[i];
         const above = i % 2 === 0;
         const color = colorFor(ev.title, ev.i);
-        const { lines, cardH: thisCardH } = eventLayouts[i];
+        const { titleLines, lines, cardH: thisCardH } = eventLayouts[i];
+        const lvl  = levelMap[i] || 0;
+        const step = above ? stepAbove : stepBelow;
 
         // Dot: inner filled + outer ring
         g.append("circle").attr("cx", x).attr("cy", midY).attr("r", 10)
@@ -358,15 +419,14 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .style("fill", color)
           .text(formatDisplayDate(ev.date, dateFormat));
 
-        // Vertical dashed connector
+        // Vertical dashed connector (extends further out for stacked levels)
         const cStart = above ? midY - 10 : midY + 10;
-        const cEnd   = above ? midY - connLen : midY + connLen;
+        const cEnd   = above ? midY - connLen - lvl * step : midY + connLen + lvl * step;
         g.append("line")
           .attr("x1", x).attr("x2", x).attr("y1", cStart).attr("y2", cEnd)
           .attr("stroke", color).attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3");
 
         const cardY  = above ? cEnd - GAP - thisCardH : cEnd + GAP;
-        const titleY = cardY + PAD_T + TITLE_PX;
 
         g.append("rect")
           .attr("x", x - CARD_W_EFF / 2 - 5).attr("y", cardY)
@@ -375,17 +435,20 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .attr("stroke", color).attr("stroke-width", 0.5).attr("stroke-opacity", 0.4)
           .attr("rx", 3);
 
-        g.append("text")
-          .attr("x", x).attr("y", titleY)
-          .attr("text-anchor", "middle")
-          .style("font-family", fontFamily)
-          .style("font-size", `${TITLE_PX}px`)
-          .style("font-weight", titleBold ? "700" : "400")
-          .style("font-style", titleItalic ? "italic" : "normal")
-          .style("fill", bg.text)
-          .text(ev.title.length > MAX_TITLE_CHARS ? ev.title.slice(0, MAX_TITLE_CHARS - 2) + "…" : ev.title);
+        // Title (one or more wrapped lines)
+        titleLines.forEach((tline, ti) => {
+          g.append("text")
+            .attr("x", x).attr("y", cardY + PAD_T + TITLE_PX + ti * TITLE_LINE_H)
+            .attr("text-anchor", "middle")
+            .style("font-family", fontFamily)
+            .style("font-size", `${TITLE_PX}px`)
+            .style("font-weight", titleBold ? "700" : "400")
+            .style("font-style", titleItalic ? "italic" : "normal")
+            .style("fill", bg.text)
+            .text(tline);
+        });
 
-        const descBaseY = titleY + 4 + DESC_PX;
+        const descBaseY = cardY + PAD_T + titleLines.length * TITLE_LINE_H + 4 + DESC_PX;
         lines.forEach((line, li) => {
           g.append("text")
             .attr("x", x).attr("y", descBaseY + li * LINE_H)
@@ -443,31 +506,9 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
       //   lineX                          ← the vertical axis line
       //   connLen + GAP + CARD_W         ← right-card area
       //
-      const lineX    = Math.round(W / 2);
       const maxCardH = Math.max(CARD_H, ...eventLayouts.map((l) => l.cardH));
       const spacing  = Math.max(138, maxCardH + 30) * zoomK;
       const padY     = titleH + maxCardH / 2 + 20;
-      const totalH   = Math.max(460, titleH + events.length * spacing + 80);
-      const H        = totalH;
-
-      svg.attr("width", W).attr("height", H).style("background", bg.bg);
-
-      if (chartTitle) {
-        svg.append("text")
-          .attr("x", W / 2).attr("y", 26).attr("text-anchor", "middle")
-          .style("font-family", "Orbitron, sans-serif").style("font-size", "15px")
-          .style("fill", bg.text).text(chartTitle);
-      }
-
-      const g = svg.append("g")
-        .attr("transform", `translate(0,${panRef.current.y})`);
-
-      const ext = 1000;
-      g.append("line")
-        .attr("x1", lineX).attr("x2", lineX)
-        .attr("y1", -ext).attr("y2", padY + (events.length - 1) * spacing + ext)
-        .attr("stroke", lineColor).attr("stroke-width", 2.2).attr("opacity", 0.5)
-        .attr("marker-end", "url(#et-d)").attr("marker-start", "url(#et-u)");
 
       // ── Time scale (shared by tick marks and optional event positioning) ──────
       const firstDateV = new Date(events[0].date);
@@ -485,14 +526,56 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         dateScaleV = d3.scaleTime().domain([d0, d1]).range([y0, y1]);
       }
       const useScalePosV = scalePos && dateScaleV != null;
-      const yFor = (ev: { date: string }, i: number) =>
-        useScalePosV ? dateScaleV!(new Date(ev.date)) : padY + i * spacing;
+      const yPos = events.map((ev, i) =>
+        useScalePosV ? dateScaleV!(new Date(ev.date)) : padY + i * spacing);
+
+      // ── Collision-aware stacking: cards on the same side that overlap in y get
+      //    pushed to a further "level" (longer connector) so they don't overlap.
+      const rightItems = events
+        .map((_, i) => ({ coord: yPos[i], extent: eventLayouts[i].cardH + 10, idx: i }))
+        .filter((_, i) => i % 2 === 0);
+      const leftItems = events
+        .map((_, i) => ({ coord: yPos[i], extent: eventLayouts[i].cardH + 10, idx: i }))
+        .filter((_, i) => i % 2 !== 0);
+      const levelMap = { ...assignLevels(rightItems, 8), ...assignLevels(leftItems, 8) };
+      const stepX = CARD_W_EFF + GAP + 16;
+      const maxRightLvl = rightItems.reduce((m, it) => Math.max(m, levelMap[it.idx]), 0);
+      const maxLeftLvl  = leftItems.reduce((m, it) => Math.max(m, levelMap[it.idx]), 0);
+
+      // Widen the canvas so stacked cards fit; keep the axis horizontally centred.
+      const rightNeeded = connLen + maxRightLvl * stepX + CARD_W_EFF + 28;
+      const leftNeeded  = connLen + maxLeftLvl  * stepX + CARD_W_EFF + 28;
+      const lineX = Math.max(leftNeeded, Math.round(W / 2));
+      const Wv    = Math.max(W, lineX + rightNeeded);
+
+      const totalH = Math.max(460, padY + (events.length - 1) * spacing + maxCardH / 2 + 60);
+      const H      = totalH;
+
+      svg.attr("width", Wv).attr("height", H).style("background", bg.bg);
+
+      if (chartTitle) {
+        svg.append("text")
+          .attr("x", Wv / 2).attr("y", 26).attr("text-anchor", "middle")
+          .style("font-family", "Orbitron, sans-serif").style("font-size", "15px")
+          .style("fill", bg.text).text(chartTitle);
+      }
+
+      const g = svg.append("g")
+        .attr("transform", `translate(0,${panRef.current.y})`);
+
+      const ext = 1000;
+      g.append("line")
+        .attr("x1", lineX).attr("x2", lineX)
+        .attr("y1", -ext).attr("y2", padY + (events.length - 1) * spacing + ext)
+        .attr("stroke", lineColor).attr("stroke-width", 2.2).attr("opacity", 0.5)
+        .attr("marker-end", "url(#et-d)").attr("marker-start", "url(#et-u)");
 
       events.forEach((ev, i) => {
-        const y       = yFor(ev, i);
+        const y       = yPos[i];
         const toRight = i % 2 === 0;
         const color   = colorFor(ev.title, ev.i);
-        const { lines, cardH: thisCardH } = eventLayouts[i];
+        const { titleLines, lines, cardH: thisCardH } = eventLayouts[i];
+        const lvl     = levelMap[i] || 0;
 
         // Dot
         g.append("circle").attr("cx", lineX).attr("cy", y).attr("r", 10)
@@ -510,9 +593,9 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .style("fill", color)
           .text(formatDisplayDate(ev.date, dateFormat));
 
-        // Horizontal dashed connector
+        // Horizontal dashed connector (extends further out for stacked levels)
         const cxStart = toRight ? lineX + 10 : lineX - 10;
-        const cxEnd   = toRight ? lineX + connLen : lineX - connLen;
+        const cxEnd   = toRight ? lineX + connLen + lvl * stepX : lineX - connLen - lvl * stepX;
         g.append("line")
           .attr("x1", cxStart).attr("x2", cxEnd).attr("y1", y).attr("y2", y)
           .attr("stroke", color).attr("stroke-width", 1.5).attr("stroke-dasharray", "4,3");
@@ -520,7 +603,6 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
         // Card — vertically centered on event y
         const cardTop  = y - thisCardH / 2;
         const cardLeft = toRight ? cxEnd + GAP : cxEnd - GAP - CARD_W_EFF - 10;
-        const titleY   = cardTop + PAD_T + TITLE_PX;
         const textX    = toRight ? cxEnd + GAP + 7 : cxEnd - GAP - 7;
         const anchor   = toRight ? "start" : "end";
 
@@ -531,17 +613,20 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
           .attr("stroke", color).attr("stroke-width", 0.5).attr("stroke-opacity", 0.4)
           .attr("rx", 3);
 
-        g.append("text")
-          .attr("x", textX).attr("y", titleY)
-          .attr("text-anchor", anchor)
-          .style("font-family", fontFamily)
-          .style("font-size", `${TITLE_PX}px`)
-          .style("font-weight", titleBold ? "700" : "400")
-          .style("font-style", titleItalic ? "italic" : "normal")
-          .style("fill", bg.text)
-          .text(ev.title.length > MAX_TITLE_CHARS ? ev.title.slice(0, MAX_TITLE_CHARS - 2) + "…" : ev.title);
+        // Title (one or more wrapped lines)
+        titleLines.forEach((tline, ti) => {
+          g.append("text")
+            .attr("x", textX).attr("y", cardTop + PAD_T + TITLE_PX + ti * TITLE_LINE_H)
+            .attr("text-anchor", anchor)
+            .style("font-family", fontFamily)
+            .style("font-size", `${TITLE_PX}px`)
+            .style("font-weight", titleBold ? "700" : "400")
+            .style("font-style", titleItalic ? "italic" : "normal")
+            .style("fill", bg.text)
+            .text(tline);
+        });
 
-        const descBaseY = titleY + 4 + DESC_PX;
+        const descBaseY = cardTop + PAD_T + titleLines.length * TITLE_LINE_H + 4 + DESC_PX;
         lines.forEach((line, li) => {
           g.append("text")
             .attr("x", textX).attr("y", descBaseY + li * LINE_H)
@@ -579,7 +664,7 @@ export default function EventTimeline({ data, mapping, options, domId }: ChartPr
 
       // Drag overlay — vertical pan only
       svg.append("rect")
-        .attr("width", W).attr("height", H)
+        .attr("width", Wv).attr("height", H)
         .attr("fill", "transparent").style("cursor", "grab")
         .call(
           d3.drag<SVGRectElement, unknown>()
